@@ -1,51 +1,54 @@
-/* Locked-In — local-first focus timer.
-   No backend, dependencies, or build step required. */
+/* Locked-In: vanilla JavaScript, compatible with static GitHub Pages hosting. */
 (() => {
   "use strict";
 
   const HISTORY_KEY = "locked_in_history_v2";
-  const ACTIVE_KEY = "locked_in_active_session_v1";
-  const SETTINGS_KEY = "locked_in_settings_v1";
-  const HARDCORE_LIMIT_MS = 15 * 60 * 1000;
+  const LEGACY_HISTORY_KEYS = ["focusforge_history_v1", "locked-in-history"];
+  const THEME_KEY = "locked_in_theme";
+  const HARDCORE_BREAK_LIMIT_SECONDS = 15 * 60;
+  const MAX_HISTORY = 1000;
 
   const $ = (id) => document.getElementById(id);
   const dom = {
     screens: [...document.querySelectorAll(".screen")],
-    setup: $("setup-screen"), timer: $("timer-screen"), report: $("report-screen"), history: $("history-screen"),
-    form: $("session-form"), intent: $("task-intent"), hours: $("duration-hours"), minutes: $("duration-minutes"),
-    presets: [...document.querySelectorAll("[data-minutes]")], style: $("session-style"), hardcore: $("hardcore-mode"),
-    setupError: $("setup-error"), status: $("status-badge"), displayIntent: $("display-intent"),
-    styleLabel: $("session-style-label"), time: $("time-display"), timerCaption: $("timer-caption"),
-    ring: $("timer-ring-progress"), breakWrapper: $("break-display-wrapper"), breakTimer: $("break-timer"),
-    breakBtn: $("break-btn"), stopBtn: $("stop-btn"), focusHelp: $("focus-help"),
-    reportBadge: $("report-type-badge"), reportTitle: $("report-title"), reportSubtitle: $("report-subtitle"),
-    efficiency: $("efficiency-percent"), efficiencyBar: $("efficiency-bar"), stars: $("stars-display"),
-    rank: $("rank-display"), verdict: $("judge-verdict"), repIntent: $("rep-intent"),
-    repFocus: $("rep-focus"), repClock: $("rep-clock"), repBreaks: $("rep-breaks"), repPlanned: $("rep-planned"),
-    breakListWrap: $("break-breakdown-wrapper"), breakList: $("break-breakdown-list"),
-    reflection: $("session-reflection"), newSession: $("new-session-btn"), reportHistory: $("report-history-btn"),
-    historyBody: $("history-table-body"), search: $("history-search"), historyMessage: $("history-message"),
-    weeklyFocus: $("weekly-focus"), weeklySessions: $("weekly-sessions"), weeklyAverage: $("weekly-average"),
-    weekBars: $("week-bars"), weekLabels: $("week-labels"),
-    allFocus: $("all-time-focus"), allSessions: $("all-time-sessions"), allAverage: $("all-time-average"),
-    themeToggle: $("theme-toggle"), importInput: $("import-json-input")
+    navLinks: [...document.querySelectorAll("[data-screen]")],
+    nav: $("site-nav"), menuToggle: $("menu-toggle"), themeSelect: $("theme-select"),
+    setupForm: $("setup-form"), taskIntent: $("task-intent"), durationPreset: $("duration-preset"),
+    customDuration: $("custom-duration"), customHours: $("custom-hours"), customMinutes: $("custom-minutes"),
+    sessionStyle: $("session-style"), setupSessionCount: $("setup-session-count"), setupTotalFocus: $("setup-total-focus"),
+    timerBackBtn: $("timer-back-btn"), statusBadge: $("status-badge"), timerHeading: $("timer-heading"),
+    timerSubtitle: $("timer-subtitle"), timeDisplay: $("time-display"), timerProgress: $("timer-progress"),
+    timerProgressBar: $("timer-progress-bar"), plannedTime: $("planned-time"), breakTime: $("break-time"),
+    elapsedTime: $("elapsed-time"), timerStatusMessage: $("timer-status-message"), breakBtn: $("break-btn"),
+    stopBtn: $("stop-btn"), reportEyebrow: $("report-eyebrow"), reportSymbol: $("report-symbol"),
+    reportTitle: $("report-title"), reportMessage: $("report-message"), efficiencyPercent: $("efficiency-percent"),
+    rankDisplay: $("rank-display"), efficiencyBar: $("efficiency-bar"), repIntent: $("rep-intent"),
+    repFocus: $("rep-focus"), repClock: $("rep-clock"), repBreaks: $("rep-breaks"),
+    breakBreakdownWrapper: $("break-breakdown-wrapper"), breakBreakdownList: $("break-breakdown-list"),
+    newSessionBtn: $("new-session-btn"), reportHistoryBtn: $("report-history-btn"),
+    historySessionCount: $("history-session-count"), historyTotalFocus: $("history-total-focus"),
+    historyAverage: $("history-average"), historySearch: $("history-search"), historyTableBody: $("history-table-body"),
+    historyEmpty: $("history-empty"), historyStartBtn: $("history-start-btn"), exportCsvBtn: $("export-csv-btn"),
+    exportJsonBtn: $("export-json-btn"), clearHistoryBtn: $("clear-history-btn"), currentYear: $("current-year"),
+    toast: $("toast"), confirmDialog: $("confirm-dialog"), confirmTitle: $("confirm-title"),
+    confirmMessage: $("confirm-message"), confirmAccept: $("confirm-accept")
   };
 
   const state = {
+    activeScreen: "setup-screen",
     session: null,
     intervalId: null,
-    history: loadHistory(),
-    settings: loadSettings(),
-    reportRecordId: null,
-    selectedPreset: 25
+    history: [],
+    toastTimer: null,
+    confirmAction: null
   };
 
   function safeRead(key, fallback) {
     try {
-      const value = localStorage.getItem(key);
-      return value ? JSON.parse(value) : fallback;
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
     } catch (error) {
-      console.warn(`Could not read ${key}:`, error);
+      console.warn(`Locked-In could not read ${key}.`, error);
       return fallback;
     }
   }
@@ -55,615 +58,524 @@
       localStorage.setItem(key, JSON.stringify(value));
       return true;
     } catch (error) {
-      console.error(`Could not save ${key}:`, error);
+      console.error(`Locked-In could not save ${key}.`, error);
+      showToast("Browser storage is unavailable or full. Export a backup and check your browser settings.");
       return false;
     }
   }
 
   function loadHistory() {
-    const value = safeRead(HISTORY_KEY, null);
-    if (Array.isArray(value)) return value.filter(isValidRecord);
-    // One-time migration from the original app's history key.
-    const old = safeRead("focusforge_history_v1", []);
-    if (!Array.isArray(old)) return [];
-    return old.map((item) => ({
-      id: createId(),
-      date: item.date || new Date().toISOString(),
-      intent: String(item.intent || "Untitled session"),
-      style: "deep-work",
-      plannedSeconds: Number(item.focusSecs) || 0,
-      focusSeconds: Number(item.focusSecs) || 0,
-      elapsedSeconds: Number(item.clockSecs) || 0,
-      breakSeconds: Math.max(0, (Number(item.clockSecs) || 0) - (Number(item.focusSecs) || 0)),
-      breaks: [],
-      efficiency: clamp(Number(item.efficiency) || 0, 0, 100),
-      outcome: "migrated",
-      hardcore: false,
-      reflection: ""
-    })).filter(isValidRecord);
+    let stored = safeRead(HISTORY_KEY, null);
+    if (!Array.isArray(stored)) {
+      for (const key of LEGACY_HISTORY_KEYS) {
+        const legacy = safeRead(key, null);
+        if (Array.isArray(legacy)) {
+          stored = legacy.map(normalizeLegacyRecord).filter(Boolean);
+          safeWrite(HISTORY_KEY, stored);
+          break;
+        }
+      }
+    }
+    state.history = (Array.isArray(stored) ? stored : [])
+      .map(normalizeLegacyRecord).filter(Boolean)
+      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+      .slice(0, MAX_HISTORY);
   }
 
-  function loadSettings() {
-    const settings = safeRead(SETTINGS_KEY, {});
+  function normalizeLegacyRecord(record) {
+    if (!record || typeof record !== "object") return null;
+    const intent = String(record.intent ?? record.task ?? record.goal ?? "Untitled session").slice(0, 120);
+    const focusSeconds = Math.max(0, Math.floor(Number(record.focusSeconds ?? record.focusedSeconds ?? record.focusTime ?? 0) || 0));
+    const elapsedSeconds = Math.max(focusSeconds, Math.floor(Number(record.elapsedSeconds ?? record.clockSeconds ?? record.realClockSeconds ?? focusSeconds) || 0));
+    const breaks = Array.isArray(record.breaks) ? record.breaks.map((b) => ({
+      durationSeconds: Math.max(0, Math.floor(Number(b.durationSeconds ?? b.duration ?? 0) || 0)),
+      startedAt: b.startedAt || null,
+      endedAt: b.endedAt || null
+    })) : [];
+    const completedAt = record.completedAt || record.date || record.timestamp || new Date().toISOString();
+    const targetSeconds = Math.max(60, Math.floor(Number(record.targetSeconds ?? record.plannedSeconds ?? focusSeconds) || focusSeconds || 60));
     return {
-      theme: settings && settings.theme === "light" ? "light" : "dark",
-      sound: settings?.sound !== false
+      id: String(record.id || `${Date.parse(completedAt) || Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+      intent, targetSeconds, focusSeconds, elapsedSeconds,
+      breakSeconds: Math.max(0, Math.floor(Number(record.breakSeconds) || breaks.reduce((sum, b) => sum + b.durationSeconds, 0))),
+      breaks, completedAt: Number.isFinite(Date.parse(completedAt)) ? new Date(completedAt).toISOString() : new Date().toISOString(),
+      hardcore: Boolean(record.hardcore ?? record.isHardcore),
+      hardcoreFailed: Boolean(record.hardcoreFailed ?? record.failed),
+      outcome: record.outcome || (record.hardcoreFailed || record.failed ? "failed" : (record.completed ? "completed" : "ended")),
+      reason: String(record.reason || "")
     };
   }
 
-  function isValidRecord(item) {
-    return item && typeof item === "object" &&
-      typeof item.id === "string" &&
-      typeof item.intent === "string" &&
-      Number.isFinite(Number(item.focusSeconds)) &&
-      Number.isFinite(Number(item.elapsedSeconds));
+  function saveHistory() {
+    safeWrite(HISTORY_KEY, state.history.slice(0, MAX_HISTORY));
   }
 
-  function persistHistory() {
-    const ok = safeWrite(HISTORY_KEY, state.history);
-    if (!ok) showHistoryMessage("Could not save changes. Export a backup and free browser storage space.", true);
-    return ok;
+  function showToast(message) {
+    dom.toast.textContent = message;
+    dom.toast.classList.add("is-visible");
+    clearTimeout(state.toastTimer);
+    state.toastTimer = setTimeout(() => dom.toast.classList.remove("is-visible"), 3500);
   }
 
-  function persistActive() {
-    if (!state.session || state.session.saved) {
-      try { localStorage.removeItem(ACTIVE_KEY); } catch (error) { console.warn(error); }
-      return;
-    }
-    if (!safeWrite(ACTIVE_KEY, state.session)) {
-      showSetupError("Your browser could not save this session. Please export your history and free some storage.");
-    }
-  }
-
-  function createId() {
-    return globalThis.crypto?.randomUUID?.() ||
-      `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
-
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
-
-  function formatClock(totalSeconds) {
-    const seconds = Math.max(0, Math.floor(totalSeconds));
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    const pad = (n) => String(n).padStart(2, "0");
-    return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-  }
-
-  function formatDuration(totalSeconds) {
-    const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    if (h) return `${h}h ${String(m).padStart(2, "0")}m`;
-    return `${m}m ${String(s).padStart(2, "0")}s`;
-  }
-
-  function formatShort(totalSeconds) {
-    const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
-  }
-
-  function showScreen(screen) {
-    dom.screens.forEach((item) => item.classList.toggle("active", item === screen));
+  function showScreen(screenId) {
+    if (!dom.screens.some((screen) => screen.id === screenId)) return;
+    state.activeScreen = screenId;
+    dom.screens.forEach((screen) => screen.classList.toggle("is-active", screen.id === screenId));
+    dom.navLinks.forEach((link) => link.classList.toggle("is-active", link.dataset.screen === screenId));
+    closeMenu();
+    if (screenId === "history-screen") renderHistory();
+    if (screenId === "setup-screen") renderSetupStats();
     window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-    const heading = screen.querySelector("h1");
-    if (heading) {
-      heading.setAttribute("tabindex", "-1");
-      heading.focus({ preventScroll: true });
+  }
+
+  function closeMenu() {
+    dom.nav.classList.remove("is-open");
+    dom.menuToggle.setAttribute("aria-expanded", "false");
+    dom.menuToggle.setAttribute("aria-label", "Open navigation menu");
+  }
+
+  function toggleMenu() {
+    const isOpen = dom.nav.classList.toggle("is-open");
+    dom.menuToggle.setAttribute("aria-expanded", String(isOpen));
+    dom.menuToggle.setAttribute("aria-label", isOpen ? "Close navigation menu" : "Open navigation menu");
+  }
+
+  function setTheme(theme, persist = true) {
+    const validThemes = ["dark", "light", "forest", "violet"];
+    const chosen = validThemes.includes(theme) ? theme : "dark";
+    document.documentElement.dataset.theme = chosen;
+    dom.themeSelect.value = chosen;
+    if (persist) {
+      try { localStorage.setItem(THEME_KEY, chosen); } catch (_) { /* Theme still works for this page view. */ }
     }
+    const themeColor = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", themeColor || "#101310");
   }
 
-  function showSetupError(message) {
-    dom.setupError.textContent = message;
-    dom.setupError.hidden = !message;
-  }
-
-  function showHistoryMessage(message, isError = false) {
-    dom.historyMessage.textContent = message;
-    dom.historyMessage.classList.toggle("error-text", isError);
-  }
-
-  function getDurationSeconds() {
-    const hours = Number(dom.hours.value);
-    const minutes = Number(dom.minutes.value);
-    if (!Number.isInteger(hours) || !Number.isInteger(minutes) ||
-        hours < 0 || hours > 12 || minutes < 0 || minutes > 59) return null;
-    const seconds = hours * 3600 + minutes * 60;
-    return seconds >= 60 && seconds <= 12 * 3600 ? seconds : null;
-  }
-
-  function selectPreset(minutes) {
-    state.selectedPreset = minutes;
-    dom.presets.forEach((button) => {
-      button.classList.toggle("selected", Number(button.dataset.minutes) === minutes);
-      button.setAttribute("aria-pressed", String(Number(button.dataset.minutes) === minutes));
-    });
-    dom.hours.value = String(Math.floor(minutes / 60));
-    dom.minutes.value = String(minutes % 60);
-    showSetupError("");
-  }
-
-  function getFocusElapsedMs(session, now = Date.now()) {
-    let elapsed = Math.max(0, now - session.startedAt);
-    for (const item of session.breaks) {
-      elapsed -= Math.max(0, (item.endedAt ?? now) - item.startedAt);
+  function parseDuration() {
+    if (dom.durationPreset.value !== "custom") return Number(dom.durationPreset.value) * 60;
+    const hoursRaw = dom.customHours.value.trim();
+    const minutesRaw = dom.customMinutes.value.trim();
+    const hours = hoursRaw === "" ? 0 : Number(hoursRaw);
+    const minutes = minutesRaw === "" ? 0 : Number(minutesRaw);
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      showToast("Enter whole hours from 0–23 and minutes from 0–59.");
+      return null;
     }
-    if (session.currentBreakStartedAt) elapsed -= Math.max(0, now - session.currentBreakStartedAt);
-    return Math.max(0, elapsed);
+    const seconds = (hours * 60 + minutes) * 60;
+    if (seconds < 60) {
+      showToast("Choose a focus duration of at least one minute.");
+      return null;
+    }
+    return seconds;
   }
 
-  function getBreakElapsedMs(session, now = Date.now()) {
-    const completed = session.breaks.reduce((sum, item) =>
-      sum + Math.max(0, (item.endedAt ?? now) - item.startedAt), 0);
-    const current = session.currentBreakStartedAt ? Math.max(0, now - session.currentBreakStartedAt) : 0;
-    return completed + current;
+  function formatClock(totalSeconds, includeHours = false) {
+    const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (includeHours || h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
-  function getRemainingSeconds(session, now = Date.now()) {
-    if (session.currentBreakStartedAt) return Math.max(0, session.remainingAtBreakStart);
-    return Math.max(0, Math.ceil((session.plannedSeconds * 1000 - getFocusElapsedMs(session, now)) / 1000));
+  function formatDuration(seconds) {
+    const s = Math.max(0, Math.floor(seconds || 0));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0 && sec > 0) return `${m}m ${sec}s`;
+    if (m > 0) return `${m}m`;
+    return `${sec}s`;
+  }
+
+  function formatDate(dateString) {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "Unknown date";
+    return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
   }
 
   function startSession(event) {
     event?.preventDefault();
-    showSetupError("");
-    const plannedSeconds = getDurationSeconds();
-    if (!plannedSeconds) {
-      showSetupError("Choose a valid duration between 1 minute and 12 hours.");
+    if (state.session) {
+      showToast("Finish your current session before starting another.");
       return;
     }
-
-    if (state.session && !confirm("A session is already in progress. End it and start a new one?")) return;
+    const intent = dom.taskIntent.value.trim();
+    if (!intent) {
+      dom.taskIntent.focus();
+      showToast("Add a focus goal first, such as coding or reading.");
+      return;
+    }
+    const targetSeconds = parseDuration();
+    if (!targetSeconds) return;
 
     const now = Date.now();
     state.session = {
-      id: createId(),
-      intent: dom.intent.value.trim() || "Unspecified objective",
-      style: dom.style.value,
-      plannedSeconds,
-      startedAt: now,
-      currentBreakStartedAt: null,
-      remainingAtBreakStart: plannedSeconds,
-      breaks: [],
-      hardcore: dom.hardcore.checked,
-      outcome: "in-progress",
-      saved: false,
-      reflection: ""
+      id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+      intent, targetSeconds, remainingSeconds: targetSeconds, hardcore: dom.sessionStyle.value === "hardcore",
+      startedAt: now, activeWorkStartedAt: now, accumulatedFocusSeconds: 0,
+      currentBreakStartedAt: null, breaks: [], breakSeconds: 0, outcome: null, reason: ""
     };
-    dom.displayIntent.textContent = state.session.intent;
-    dom.styleLabel.textContent = `${state.session.style.replaceAll("-", " ")} SESSION`.toUpperCase();
-    dom.status.innerHTML = '<span class="dot"></span> FOCUSING';
-    dom.status.classList.remove("on-break");
-    dom.breakBtn.innerHTML = 'Take a break <kbd>B</kbd>';
-    dom.breakWrapper.hidden = true;
-    dom.focusHelp.textContent = "Protect this time. You can take a tracked break whenever you need one.";
-    dom.timerCaption.textContent = "TIME TO FOCUS";
-    showScreen(dom.timer);
-    persistActive();
+    showScreen("timer-screen");
     renderTimer();
-    startTicker();
+    state.intervalId = window.setInterval(tick, 250);
   }
 
-  function startTicker() {
-    clearInterval(state.intervalId);
-    state.intervalId = setInterval(tick, 250);
-    tick();
+  function activeFocusSeconds(session, now = Date.now()) {
+    return session.accumulatedFocusSeconds + (!session.currentBreakStartedAt && session.activeWorkStartedAt ? Math.max(0, (now - session.activeWorkStartedAt) / 1000) : 0);
+  }
+
+  function elapsedSeconds(session, now = Date.now()) {
+    return Math.max(0, (now - session.startedAt) / 1000);
+  }
+
+  function currentBreakSeconds(session, now = Date.now()) {
+    return session.breakSeconds + (session.currentBreakStartedAt ? Math.max(0, (now - session.currentBreakStartedAt) / 1000) : 0);
   }
 
   function tick() {
     const session = state.session;
-    if (!session || session.saved) return;
+    if (!session) return;
     const now = Date.now();
 
-    if (session.currentBreakStartedAt && session.hardcore &&
-        now - session.currentBreakStartedAt >= HARDCORE_LIMIT_MS) {
-      finishSession("hardcore-failed");
+    if (session.currentBreakStartedAt && session.hardcore && (now - session.currentBreakStartedAt) / 1000 > HARDCORE_BREAK_LIMIT_SECONDS) {
+      finishSession("failed", "A single break exceeded 15 minutes.");
       return;
     }
 
-    if (!session.currentBreakStartedAt && getRemainingSeconds(session, now) <= 0) {
-      finishSession("completed");
-      return;
+    if (!session.currentBreakStartedAt) {
+      session.remainingSeconds = Math.max(0, session.targetSeconds - activeFocusSeconds(session, now));
+      if (session.remainingSeconds <= 0) {
+        finishSession("completed", "Target duration reached.");
+        return;
+      }
     }
     renderTimer(now);
+  }
+
+  function toggleBreak() {
+    const session = state.session;
+    if (!session) return;
+    const now = Date.now();
+    if (!session.currentBreakStartedAt) {
+      session.accumulatedFocusSeconds += Math.max(0, (now - session.activeWorkStartedAt) / 1000);
+      session.activeWorkStartedAt = null;
+      session.currentBreakStartedAt = now;
+      dom.timerStatusMessage.textContent = session.hardcore ? "Break started. In Hardcore mode, keep it under 15 minutes." : "Take a breath. Resume when you're ready.";
+      showToast("Break started.");
+    } else {
+      const durationSeconds = Math.max(0, (now - session.currentBreakStartedAt) / 1000);
+      session.breakSeconds += durationSeconds;
+      session.breaks.push({ startedAt: new Date(session.currentBreakStartedAt).toISOString(), endedAt: new Date(now).toISOString(), durationSeconds: Math.floor(durationSeconds) });
+      session.currentBreakStartedAt = null;
+      session.activeWorkStartedAt = now;
+      dom.timerStatusMessage.textContent = "Back to it. Pick up where you left off.";
+      showToast("Break ended. Focus resumed.");
+    }
+    renderTimer(now);
+  }
+
+  function askConfirm(title, message, action, acceptText = "Confirm") {
+    dom.confirmTitle.textContent = title;
+    dom.confirmMessage.textContent = message;
+    dom.confirmAccept.textContent = acceptText;
+    state.confirmAction = action;
+    if (typeof dom.confirmDialog.showModal === "function") dom.confirmDialog.showModal();
+    else if (window.confirm(message)) action();
+  }
+
+  function stopSession() {
+    if (!state.session) return;
+    askConfirm("End this session?", "Your time so far will be saved to your session history.", () => finishSession("ended", "Ended early."), "End session");
+  }
+
+  function finishSession(outcome, reason) {
+    const session = state.session;
+    if (!session) return;
+    const now = Date.now();
+    if (session.currentBreakStartedAt) {
+      const durationSeconds = Math.max(0, (now - session.currentBreakStartedAt) / 1000);
+      session.breakSeconds += durationSeconds;
+      session.breaks.push({ startedAt: new Date(session.currentBreakStartedAt).toISOString(), endedAt: new Date(now).toISOString(), durationSeconds: Math.floor(durationSeconds) });
+      session.currentBreakStartedAt = null;
+    }
+    const focusSeconds = Math.min(session.targetSeconds, Math.max(0, Math.floor(activeFocusSeconds(session, now))));
+    const elapsed = Math.max(0, Math.floor(elapsedSeconds(session, now)));
+    const breakSeconds = Math.max(0, Math.floor(session.breakSeconds));
+    const record = {
+      id: session.id, intent: session.intent, targetSeconds: session.targetSeconds,
+      focusSeconds, elapsedSeconds: Math.max(focusSeconds + breakSeconds, elapsed),
+      breakSeconds, breaks: session.breaks, completedAt: new Date(now).toISOString(),
+      hardcore: session.hardcore, hardcoreFailed: outcome === "failed", outcome, reason
+    };
+    clearInterval(state.intervalId);
+    state.intervalId = null;
+    state.session = null;
+    state.history.unshift(record);
+    state.history = state.history.slice(0, MAX_HISTORY);
+    saveHistory();
+    renderReport(record);
+    renderSetupStats();
+    showScreen("report-screen");
+    if (outcome === "completed") playChime();
   }
 
   function renderTimer(now = Date.now()) {
     const session = state.session;
     if (!session) return;
-    const remaining = getRemainingSeconds(session, now);
-    dom.time.textContent = formatClock(remaining);
-    const focusElapsed = getFocusElapsedMs(session, now);
-    const progress = clamp(focusElapsed / (session.plannedSeconds * 1000), 0, 1);
-    dom.ring.style.strokeDashoffset = String(728.85 * (1 - progress));
-    dom.ring.classList.toggle("break-progress", Boolean(session.currentBreakStartedAt));
-
-    if (session.currentBreakStartedAt) {
-      const elapsed = Math.floor((now - session.currentBreakStartedAt) / 1000);
-      dom.breakWrapper.hidden = false;
-      dom.breakTimer.textContent = formatClock(elapsed);
-      dom.status.innerHTML = '<span class="dot"></span> ON BREAK';
-      dom.status.classList.add("on-break");
-      dom.breakBtn.innerHTML = 'Resume focus <kbd>B</kbd>';
-      dom.timerCaption.textContent = "BREAK IN PROGRESS";
-      dom.focusHelp.textContent = session.hardcore
-        ? `Hardcore mode: a break must stay under 15 minutes. ${formatClock(Math.max(0, 900 - elapsed))} remaining.`
-        : "Take the time you need, then return when you're ready.";
-    } else {
-      dom.breakWrapper.hidden = true;
-      dom.status.innerHTML = '<span class="dot"></span> FOCUSING';
-      dom.status.classList.remove("on-break");
-      dom.breakBtn.innerHTML = 'Take a break <kbd>B</kbd>';
-      dom.timerCaption.textContent = "TIME TO FOCUS";
-      dom.focusHelp.textContent = `${formatDuration(Math.floor(focusElapsed / 1000))} focused so far`;
-    }
-  }
-
-  function toggleBreak() {
-    const session = state.session;
-    if (!session || session.saved) return;
-    const now = Date.now();
-
-    if (!session.currentBreakStartedAt) {
-      session.remainingAtBreakStart = getRemainingSeconds(session, now);
-      session.currentBreakStartedAt = now;
-    } else {
-      const duration = Math.max(0, now - session.currentBreakStartedAt);
-      session.breaks.push({ startedAt: session.currentBreakStartedAt, endedAt: now, durationMs: duration });
-      session.currentBreakStartedAt = null;
-      if (session.hardcore && duration >= HARDCORE_LIMIT_MS) {
-        finishSession("hardcore-failed");
-        return;
-      }
-    }
-    persistActive();
-    tick();
-  }
-
-  function classifyScore(efficiency, outcome) {
-    if (outcome === "hardcore-failed") return { stars: "☆☆☆☆☆", rank: "Hardcore limit reached", verdict: "This session ended because a break reached 15 minutes.", tone: "danger" };
-    if (outcome === "abandoned") return { stars: "☆☆☆☆☆", rank: "Session ended early", verdict: "You stopped this session early. The time you focused still counts.", tone: "warning" };
-    if (efficiency >= 96) return { stars: "★★★★★", rank: "Highly consistent", verdict: "Very little time was spent away from the session. Nice consistency.", tone: "success" };
-    if (efficiency >= 89) return { stars: "★★★★☆", rank: "Strong focus", verdict: "You kept a steady pace with a small amount of break time.", tone: "success" };
-    if (efficiency >= 80) return { stars: "★★★☆☆", rank: "Balanced session", verdict: "A balanced session. Review your breaks if you want to tighten the rhythm.", tone: "warning" };
-    if (efficiency >= 66) return { stars: "★★☆☆☆", rank: "Room to improve", verdict: "There was a fair amount of break time. Consider shorter focus blocks next time.", tone: "warning" };
-    return { stars: "★☆☆☆☆", rank: "A session to learn from", verdict: "Every session gives you information. Try a smaller, clearer target next time.", tone: "danger" };
-  }
-
-  function finishSession(outcome = "abandoned") {
-    const session = state.session;
-    if (!session || session.saved) return;
-    clearInterval(state.intervalId);
-    state.intervalId = null;
-
-    const endedAt = Date.now();
-    if (session.currentBreakStartedAt) {
-      session.breaks.push({
-        startedAt: session.currentBreakStartedAt,
-        endedAt,
-        durationMs: Math.max(0, endedAt - session.currentBreakStartedAt)
-      });
-      session.currentBreakStartedAt = null;
-    }
-
-    const focusSeconds = Math.min(session.plannedSeconds, Math.floor(getFocusElapsedMs(session, endedAt) / 1000));
-    const elapsedSeconds = Math.max(0, Math.floor((endedAt - session.startedAt) / 1000));
-    const breakSeconds = Math.max(0, elapsedSeconds - focusSeconds);
-    const efficiency = elapsedSeconds > 0 ? clamp((focusSeconds / elapsedSeconds) * 100, 0, 100) : 0;
-    const record = {
-      id: session.id,
-      date: new Date(endedAt).toISOString(),
-      intent: session.intent,
-      style: session.style,
-      plannedSeconds: session.plannedSeconds,
-      focusSeconds,
-      elapsedSeconds,
-      breakSeconds,
-      breaks: session.breaks.map((item) => ({
-        startedAt: new Date(item.startedAt).toISOString(),
-        endedAt: new Date(item.endedAt).toISOString(),
-        durationSeconds: Math.floor(item.durationMs / 1000)
-      })),
-      efficiency: Number(efficiency.toFixed(1)),
-      outcome,
-      hardcore: session.hardcore,
-      reflection: ""
-    };
-
-    session.saved = true;
-    session.outcome = outcome;
-    state.history.unshift(record);
-    state.history = state.history.slice(0, 5000);
-    persistHistory();
-    persistActive();
-    state.reportRecordId = record.id;
-    renderReport(record);
-    renderDashboard();
-    showScreen(dom.report);
+    const onBreak = Boolean(session.currentBreakStartedAt);
+    const focus = activeFocusSeconds(session, now);
+    const elapsed = elapsedSeconds(session, now);
+    const breaks = currentBreakSeconds(session, now);
+    const remaining = onBreak ? session.remainingSeconds : Math.max(0, session.targetSeconds - focus);
+    dom.timerHeading.textContent = session.intent;
+    dom.timerSubtitle.textContent = session.hardcore ? "Hardcore mode is active." : "Stay with one thing.";
+    dom.timeDisplay.textContent = formatClock(remaining, session.targetSeconds >= 3600);
+    dom.statusBadge.classList.toggle("is-break", onBreak);
+    dom.statusBadge.innerHTML = `<span class="status-dot"></span> ${onBreak ? "ON BREAK" : "FOCUSING"}`;
+    dom.breakBtn.innerHTML = onBreak ? '↻ Resume focus <kbd>B</kbd>' : '☕ Take a break <kbd>B</kbd>';
+    dom.plannedTime.textContent = formatDuration(session.targetSeconds);
+    dom.breakTime.textContent = formatClock(breaks);
+    dom.elapsedTime.textContent = formatClock(elapsed);
+    dom.timerStatusMessage.textContent = onBreak
+      ? (session.hardcore ? `Hardcore break: ${formatClock((now - session.currentBreakStartedAt) / 1000)} / 15:00` : "Take a breath. Resume when you're ready.")
+      : dom.timerStatusMessage.textContent;
+    const percent = Math.min(100, Math.max(0, focus / session.targetSeconds * 100));
+    dom.timerProgressBar.style.width = `${percent}%`;
+    dom.timerProgress.setAttribute("aria-valuenow", String(Math.round(percent)));
+    document.title = `${formatClock(remaining)} · Locked-In`;
   }
 
   function renderReport(record) {
-    const score = classifyScore(record.efficiency, record.outcome);
-    dom.reportBadge.textContent = record.outcome === "completed" ? "SESSION COMPLETED" :
-      record.outcome === "hardcore-failed" ? "HARDCORE LIMIT REACHED" : "STOPPED EARLY";
-    dom.reportTitle.textContent = record.outcome === "completed" ? "You showed up." : "Every session counts.";
-    dom.reportSubtitle.textContent = record.outcome === "completed"
-      ? "Progress is built one session at a time."
-      : "Use this session as information, not a reason to give up.";
-    dom.efficiency.textContent = `${record.efficiency.toFixed(1)}%`;
-    dom.efficiencyBar.style.width = `${record.efficiency}%`;
-    dom.stars.textContent = score.stars;
-    dom.rank.textContent = score.rank;
-    dom.verdict.textContent = score.verdict;
+    const ratio = record.elapsedSeconds > 0 ? Math.round(record.focusSeconds / record.elapsedSeconds * 100) : 0;
+    const complete = record.outcome === "completed";
+    const failed = record.outcome === "failed";
+    dom.reportEyebrow.textContent = failed ? "HARDCORE SESSION FAILED" : complete ? "SESSION COMPLETE" : "SESSION ENDED";
+    dom.reportSymbol.textContent = failed ? "!" : complete ? "✓" : "↗";
+    dom.reportTitle.textContent = failed ? "Reset and try again." : complete ? "You showed up." : "Every minute counts.";
+    dom.reportMessage.textContent = failed ? "One session doesn't define you. Start again when you're ready." : complete ? "You reached your planned focus duration. Nice work." : "You ended this session early. Your time has still been recorded.";
+    dom.efficiencyPercent.textContent = `${ratio}%`;
+    dom.efficiencyBar.style.width = `${ratio}%`;
+    dom.rankDisplay.textContent = ratio >= 90 ? "Very focused time" : ratio >= 70 ? "Solid effort" : ratio >= 40 ? "Room for breaks" : "A work in progress";
     dom.repIntent.textContent = record.intent;
-    dom.repFocus.textContent = formatDuration(record.focusSeconds);
-    dom.repClock.textContent = formatDuration(record.elapsedSeconds);
-    dom.repBreaks.textContent = `${record.breaks.length} · ${formatDuration(record.breakSeconds)}`;
-    dom.repPlanned.textContent = formatDuration(record.plannedSeconds);
-    dom.reflection.value = record.reflection || "";
-
-    if (record.breaks.length) {
-      dom.breakListWrap.hidden = false;
-      dom.breakList.replaceChildren();
-      record.breaks.forEach((item, index) => {
-        const li = document.createElement("li");
-        li.textContent = `Break ${index + 1} — ${formatDuration(item.durationSeconds)}`;
-        dom.breakList.appendChild(li);
-      });
-    } else {
-      dom.breakListWrap.hidden = true;
-      dom.breakList.replaceChildren();
-    }
-  }
-
-  function saveReflection() {
-    if (!state.reportRecordId) return;
-    const record = state.history.find((item) => item.id === state.reportRecordId);
-    if (!record) return;
-    record.reflection = dom.reflection.value.trim().slice(0, 500);
-    persistHistory();
-  }
-
-  function renderDashboard() {
-    const now = new Date();
-    const monday = new Date(now);
-    monday.setHours(0, 0, 0, 0);
-    const day = (monday.getDay() + 6) % 7;
-    monday.setDate(monday.getDate() - day);
-    const weekRecords = state.history.filter((item) => new Date(item.date) >= monday);
-    const focus = weekRecords.reduce((sum, item) => sum + item.focusSeconds, 0);
-    const average = weekRecords.length ? weekRecords.reduce((sum, item) => sum + item.efficiency, 0) / weekRecords.length : null;
-    dom.weeklyFocus.textContent = formatShort(focus);
-    dom.weeklySessions.textContent = String(weekRecords.length);
-    dom.weeklyAverage.textContent = average === null ? "—" : `${Math.round(average)}%`;
-
-    const days = [];
-    for (let offset = 6; offset >= 0; offset--) {
-      const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - offset);
-      const key = date.toDateString();
-      const seconds = state.history.filter((item) => new Date(item.date).toDateString() === key)
-        .reduce((sum, item) => sum + item.focusSeconds, 0);
-      days.push({ label: date.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 1), seconds });
-    }
-    const max = Math.max(1, ...days.map((item) => item.seconds));
-    dom.weekBars.replaceChildren();
-    dom.weekLabels.replaceChildren();
-    days.forEach((item) => {
-      const bar = document.createElement("div");
-      bar.className = "week-bar";
-      bar.style.height = `${Math.max(4, (item.seconds / max) * 54)}px`;
-      bar.title = `${formatDuration(item.seconds)} focused`;
-      bar.setAttribute("aria-label", `${item.label}: ${formatDuration(item.seconds)}`);
-      dom.weekBars.appendChild(bar);
-      const label = document.createElement("span"); label.textContent = item.label; dom.weekLabels.appendChild(label);
+    dom.repFocus.textContent = formatClock(record.focusSeconds, record.focusSeconds >= 3600);
+    dom.repClock.textContent = formatClock(record.elapsedSeconds, record.elapsedSeconds >= 3600);
+    dom.repBreaks.textContent = `${record.breaks.length} · ${formatClock(record.breakSeconds)}`;
+    dom.breakBreakdownList.replaceChildren();
+    record.breaks.forEach((item, index) => {
+      const li = document.createElement("li");
+      li.textContent = `Break ${index + 1}: ${formatClock(item.durationSeconds)}${item.durationSeconds > HARDCORE_BREAK_LIMIT_SECONDS ? " · over 15 minutes" : ""}`;
+      dom.breakBreakdownList.append(li);
     });
+    dom.breakBreakdownWrapper.classList.toggle("is-hidden", record.breaks.length === 0);
+    document.title = "Session report · Locked-In";
+  }
 
-    const total = state.history.reduce((sum, item) => sum + item.focusSeconds, 0);
-    const avg = state.history.length ? state.history.reduce((sum, item) => sum + item.efficiency, 0) / state.history.length : null;
-    dom.allFocus.textContent = formatShort(total);
-    dom.allSessions.textContent = String(state.history.length);
-    dom.allAverage.textContent = avg === null ? "—" : `${Math.round(avg)}%`;
+  function renderSetupStats() {
+    dom.setupSessionCount.textContent = String(state.history.length);
+    const focus = state.history.reduce((sum, item) => sum + item.focusSeconds, 0);
+    dom.setupTotalFocus.textContent = formatDuration(focus);
   }
 
   function renderHistory() {
-    const query = dom.search.value.trim().toLowerCase();
-    const records = state.history.filter((item) => item.intent.toLowerCase().includes(query));
-    dom.historyBody.replaceChildren();
-
-    if (!records.length) {
-      const row = document.createElement("tr");
-      const cell = document.createElement("td");
-      cell.colSpan = 6;
-      cell.className = "empty-cell";
-      cell.textContent = query ? "No sessions match your search." : "No sessions yet. Start a focus session to see it here.";
-      row.appendChild(cell);
-      dom.historyBody.appendChild(row);
-      return;
-    }
-
-    records.forEach((item) => {
-      const row = document.createElement("tr");
-      const values = [
-        new Date(item.date).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-        item.intent,
-        formatDuration(item.focusSeconds),
-        formatDuration(item.elapsedSeconds),
-        `${Number(item.efficiency).toFixed(1)}%`,
-        item.outcome === "completed" ? "Completed" : item.outcome === "hardcore-failed" ? "Hardcore fail" : item.outcome === "migrated" ? "Imported" : "Stopped early"
+    const query = dom.historySearch.value.trim().toLocaleLowerCase();
+    const rows = state.history.filter((item) => item.intent.toLocaleLowerCase().includes(query));
+    dom.historyTableBody.replaceChildren();
+    rows.forEach((item) => {
+      const tr = document.createElement("tr");
+      const ratio = item.elapsedSeconds ? Math.round(item.focusSeconds / item.elapsedSeconds * 100) : 0;
+      const outcomeLabel = item.outcome === "completed" ? "Completed" : item.outcome === "failed" ? "Hardcore failed" : "Ended early";
+      const cells = [
+        formatDate(item.completedAt), item.intent, formatClock(item.focusSeconds, item.focusSeconds >= 3600),
+        formatClock(item.elapsedSeconds, item.elapsedSeconds >= 3600), `${ratio}%`
       ];
-      values.forEach((value, index) => {
-        const cell = document.createElement("td");
-        cell.textContent = value;
-        if (index === 1) cell.className = "goal-cell";
-        row.appendChild(cell);
+      cells.forEach((value) => {
+        const td = document.createElement("td");
+        td.textContent = value;
+        tr.append(td);
       });
-      dom.historyBody.appendChild(row);
+      const outcomeCell = document.createElement("td");
+      const pill = document.createElement("span");
+      pill.className = `outcome-pill ${item.outcome === "completed" ? "success" : item.outcome === "failed" ? "failed" : ""}`;
+      pill.textContent = outcomeLabel;
+      outcomeCell.append(pill);
+      tr.append(outcomeCell);
+      dom.historyTableBody.append(tr);
     });
-  }
-
-  function openHistory() {
-    renderHistory();
-    renderDashboard();
-    showHistoryMessage("");
-    showScreen(dom.history);
+    const totalFocus = state.history.reduce((sum, item) => sum + item.focusSeconds, 0);
+    const avg = state.history.length ? Math.round(state.history.reduce((sum, item) => sum + (item.elapsedSeconds ? item.focusSeconds / item.elapsedSeconds * 100 : 0), 0) / state.history.length) : null;
+    dom.historySessionCount.textContent = String(state.history.length);
+    dom.historyTotalFocus.textContent = formatDuration(totalFocus);
+    dom.historyAverage.textContent = avg === null ? "—" : `${avg}%`;
+    dom.historyEmpty.classList.toggle("is-visible", rows.length === 0);
+    if (state.history.length > 0 && rows.length === 0) {
+      dom.historyEmpty.querySelector("h2").textContent = "No matching sessions";
+      dom.historyEmpty.querySelector("p").textContent = "Try a different search term.";
+      dom.historyStartBtn.classList.add("is-hidden");
+    } else {
+      dom.historyEmpty.querySelector("h2").textContent = "No sessions yet";
+      dom.historyEmpty.querySelector("p").textContent = "Your completed sessions will appear here. Start with one small goal.";
+      dom.historyStartBtn.classList.remove("is-hidden");
+    }
+    renderSetupStats();
   }
 
   function csvEscape(value) {
     let text = String(value ?? "");
-    // Avoid spreadsheet formula injection for cells starting with formula markers.
-    if (/^[\s\u0000-\u001f]*[=+\-@]/.test(text)) text = `'${text}`;
+    // Prevent spreadsheet formula injection in exported user-controlled values.
+    if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
     return `"${text.replace(/"/g, '""')}"`;
   }
 
-  function downloadFile(filename, content, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
+  function downloadFile(filename, content, type) {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = filename;
-    document.body.appendChild(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function exportCsv() {
-    if (!state.history.length) { showHistoryMessage("There is no session history to export.", true); return; }
-    const headers = ["Date", "Goal", "Style", "PlannedSeconds", "FocusSeconds", "ElapsedSeconds", "BreakSeconds", "EfficiencyPercent", "Outcome", "Reflection"];
-    const lines = [headers.map(csvEscape).join(",")];
-    state.history.forEach((item) => {
-      lines.push([
-        item.date, item.intent, item.style, item.plannedSeconds, item.focusSeconds,
-        item.elapsedSeconds, item.breakSeconds, item.efficiency, item.outcome, item.reflection
-      ].map(csvEscape).join(","));
-    });
-    downloadFile(`locked-in-history-${new Date().toISOString().slice(0, 10)}.csv`, "\uFEFF" + lines.join("\r\n"), "text/csv;charset=utf-8");
-    showHistoryMessage("CSV export created.");
+    if (!state.history.length) {
+      showToast("There are no sessions to export yet.");
+      return;
+    }
+    const header = ["Completed At", "Goal", "Planned Seconds", "Focused Seconds", "Elapsed Seconds", "Break Seconds", "Break Count", "Focus Time Ratio (%)", "Session Style", "Outcome", "Reason"];
+    const rows = state.history.map((item) => [
+      item.completedAt, item.intent, item.targetSeconds, item.focusSeconds, item.elapsedSeconds,
+      item.breakSeconds, item.breaks.length, item.elapsedSeconds ? Math.round(item.focusSeconds / item.elapsedSeconds * 100) : 0,
+      item.hardcore ? "Hardcore" : "Standard", item.outcome, item.reason
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\r\n");
+    downloadFile("locked-in-sessions.csv", "\uFEFF" + csv, "text/csv;charset=utf-8");
+    showToast("CSV export prepared.");
   }
 
   function exportJson() {
-    const backup = { app: "locked-in", schemaVersion: 2, exportedAt: new Date().toISOString(), sessions: state.history };
-    downloadFile(`locked-in-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup, null, 2), "application/json");
-    showHistoryMessage("Backup created. Keep it somewhere safe.");
+    const backup = { schemaVersion: 1, exportedAt: new Date().toISOString(), app: "Locked-In", sessions: state.history };
+    downloadFile("locked-in-backup.json", JSON.stringify(backup, null, 2), "application/json");
+    showToast("JSON backup prepared.");
   }
 
-  async function importJson(file) {
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text);
-      const records = Array.isArray(parsed) ? parsed : parsed.sessions;
-      if (!Array.isArray(records) || !records.every(isValidRecord)) {
-        throw new Error("This file does not contain a valid Locked-In session backup.");
-      }
-      const existingIds = new Set(state.history.map((item) => item.id));
-      const imported = records.filter((item) => !existingIds.has(item.id));
-      if (!imported.length) {
-        showHistoryMessage("No new sessions found in this backup.");
-        return;
-      }
-      if (!confirm(`Import ${imported.length} new session(s)? Existing sessions will be kept.`)) return;
-      state.history = [...imported, ...state.history].slice(0, 5000);
-      if (persistHistory()) {
-        renderHistory(); renderDashboard();
-        showHistoryMessage(`Restored ${imported.length} session(s).`);
-      }
-    } catch (error) {
-      showHistoryMessage(error.message || "Could not read that backup file.", true);
-    } finally {
-      dom.importInput.value = "";
-    }
-  }
-
-  function applyTheme() {
-    document.documentElement.dataset.theme = state.settings.theme;
-    dom.themeToggle.setAttribute("aria-label", state.settings.theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
-  }
-
-  dom.form.addEventListener("submit", startSession);
-  dom.presets.forEach((button) => button.addEventListener("click", () => selectPreset(Number(button.dataset.minutes))));
-  [dom.hours, dom.minutes].forEach((input) => input.addEventListener("input", () => {
-    state.selectedPreset = null;
-    dom.presets.forEach((button) => button.classList.remove("selected"));
-    showSetupError("");
-  }));
-  $("view-history-btn").addEventListener("click", openHistory);
-  $("back-to-setup-btn").addEventListener("click", () => showScreen(dom.setup));
-  dom.reportHistory.addEventListener("click", openHistory);
-  dom.newSession.addEventListener("click", () => {
-    state.session = null; persistActive(); showScreen(dom.setup); dom.intent.focus();
-  });
-  $("minimize-session-btn").addEventListener("click", () => {
-    if (state.session && confirm("Your session will keep running. Return to setup?")) showScreen(dom.setup);
-  });
-  dom.breakBtn.addEventListener("click", toggleBreak);
-  dom.stopBtn.addEventListener("click", () => {
-    if (confirm("End this session now? Your focused time will still be recorded.")) finishSession("abandoned");
-  });
-  dom.search.addEventListener("input", renderHistory);
-  $("export-csv-btn").addEventListener("click", exportCsv);
-  $("export-json-btn").addEventListener("click", exportJson);
-  dom.importInput.addEventListener("change", () => importJson(dom.importInput.files?.[0]));
-  $("clear-history-btn").addEventListener("click", () => {
-    if (!state.history.length) { showHistoryMessage("History is already empty."); return; }
-    if (!confirm("Delete all saved sessions from this browser? Export a backup first if you may need them.")) return;
-    const previous = state.history;
-    state.history = [];
-    if (persistHistory()) {
-      renderHistory(); renderDashboard(); showHistoryMessage("History cleared.");
-    } else {
-      state.history = previous;
-    }
-  });
-  dom.reflection.addEventListener("change", saveReflection);
-  dom.themeToggle.addEventListener("click", () => {
-    state.settings.theme = state.settings.theme === "dark" ? "light" : "dark";
-    safeWrite(SETTINGS_KEY, state.settings); applyTheme();
-  });
-
-  window.addEventListener("keydown", (event) => {
-    const target = event.target;
-    const isTyping = target instanceof HTMLElement &&
-      (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName));
-    if (isTyping || event.altKey || event.ctrlKey || event.metaKey) return;
-    if (event.key.toLowerCase() === "b" && state.session && !state.session.saved) {
-      event.preventDefault(); toggleBreak();
-    }
-    if (event.key.toLowerCase() === "s" && state.session && !state.session.saved) {
-      event.preventDefault();
-      if (confirm("End this session now? Your focused time will still be recorded.")) finishSession("abandoned");
-    }
-  });
-
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && state.session && !state.session.saved) tick();
-  });
-  window.addEventListener("pageshow", () => {
-    if (state.session && !state.session.saved) tick();
-  });
-  window.addEventListener("beforeunload", () => {
-    if (state.session && !state.session.saved) persistActive();
-  });
-
-  function recoverActiveSession() {
-    const saved = safeRead(ACTIVE_KEY, null);
-    if (!saved || !saved.id || saved.saved || !saved.startedAt || !saved.plannedSeconds) return;
-    if (!confirm("A focus session was in progress when you last left. Resume it?")) {
-      // Do not silently discard it; offer to resume on the next visit.
+  function clearHistory() {
+    if (!state.history.length) {
+      showToast("Your history is already empty.");
       return;
     }
-    state.session = saved;
-    dom.displayIntent.textContent = saved.intent || "Unspecified objective";
-    dom.styleLabel.textContent = `${String(saved.style || "deep-work").replaceAll("-", " ")} SESSION`.toUpperCase();
-    showScreen(dom.timer);
-    startTicker();
+    askConfirm("Clear all history?", "This permanently removes saved sessions from this browser. Export a backup first if you want to keep them.", () => {
+      state.history = [];
+      saveHistory();
+      renderHistory();
+      showToast("Session history cleared.");
+    }, "Clear history");
   }
 
-  $("current-year").textContent = String(new Date().getFullYear());
-  applyTheme();
-  renderDashboard();
-  recoverActiveSession();
+  function playChime() {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      const context = new AudioContextClass();
+      const now = context.currentTime;
+      [523.25, 659.25, 783.99].forEach((frequency, index) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(frequency, now + index * 0.12);
+        gain.gain.setValueAtTime(0.0001, now + index * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.12, now + index * 0.12 + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.12 + 0.25);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(now + index * 0.12);
+        oscillator.stop(now + index * 0.12 + 0.27);
+      });
+      window.setTimeout(() => context.close().catch(() => {}), 1200);
+    } catch (error) {
+      console.info("Audio notification is unavailable in this browser.", error);
+    }
+  }
+
+  function handleKeyboard(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target;
+    const tag = target?.tagName?.toLowerCase();
+    if (["input", "textarea", "select", "button"].includes(tag) || target?.isContentEditable) return;
+    if (event.key.toLowerCase() === "b" && state.activeScreen === "timer-screen") {
+      event.preventDefault();
+      toggleBreak();
+    }
+    if (event.key.toLowerCase() === "s" && state.activeScreen === "timer-screen") {
+      event.preventDefault();
+      stopSession();
+    }
+    if (event.key === "Escape") closeMenu();
+  }
+
+  function bindEvents() {
+    dom.menuToggle.addEventListener("click", toggleMenu);
+    dom.navLinks.forEach((button) => button.addEventListener("click", () => showScreen(button.dataset.screen)));
+    dom.nav.querySelector('a[href="#about"]').addEventListener("click", () => {
+      closeMenu();
+      setTimeout(() => document.getElementById("about").scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    });
+    dom.themeSelect.addEventListener("change", () => setTheme(dom.themeSelect.value));
+    dom.durationPreset.addEventListener("change", () => {
+      const custom = dom.durationPreset.value === "custom";
+      dom.customDuration.classList.toggle("is-hidden", !custom);
+      dom.customDuration.setAttribute("aria-hidden", String(!custom));
+      if (custom) dom.customHours.focus();
+    });
+    dom.setupForm.addEventListener("submit", startSession);
+    dom.timerBackBtn.addEventListener("click", () => {
+      askConfirm("Leave the timer?", "Your active session will be ended and saved to history.", () => finishSession("ended", "Returned to setup."), "End and return");
+    });
+    dom.breakBtn.addEventListener("click", toggleBreak);
+    dom.stopBtn.addEventListener("click", stopSession);
+    dom.newSessionBtn.addEventListener("click", () => {
+      dom.taskIntent.value = "";
+      showScreen("setup-screen");
+      dom.taskIntent.focus();
+    });
+    dom.reportHistoryBtn.addEventListener("click", () => showScreen("history-screen"));
+    dom.historyStartBtn.addEventListener("click", () => showScreen("setup-screen"));
+    dom.historySearch.addEventListener("input", renderHistory);
+    dom.exportCsvBtn.addEventListener("click", exportCsv);
+    dom.exportJsonBtn.addEventListener("click", exportJson);
+    dom.clearHistoryBtn.addEventListener("click", clearHistory);
+    dom.confirmDialog.addEventListener("close", () => {
+      const action = state.confirmAction;
+      state.confirmAction = null;
+      if (dom.confirmDialog.returnValue === "confirm" && action) action();
+    });
+    document.addEventListener("keydown", handleKeyboard);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && state.session) tick();
+    });
+    window.addEventListener("beforeunload", (event) => {
+      if (state.session) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    });
+    window.addEventListener("resize", () => {
+      if (window.innerWidth > 760) closeMenu();
+    });
+  }
+
+  function init() {
+    loadHistory();
+    let savedTheme = "dark";
+    try { savedTheme = localStorage.getItem(THEME_KEY) || "dark"; } catch (_) { /* Use default theme. */ }
+    setTheme(savedTheme, false);
+    dom.currentYear.textContent = String(new Date().getFullYear());
+    bindEvents();
+    renderSetupStats();
+    renderHistory();
+  }
+
+  init();
 })();
