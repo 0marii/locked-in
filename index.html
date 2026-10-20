@@ -1,183 +1,210 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FocusForge | Elite Study Manager</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%230d1117' stroke='%2330363d' stroke-width='6'/><text x='50%' y='52%' dominant-baseline='central' text-anchor='middle' font-family='monospace' font-weight='900' font-size='42' fill='%232ea043'>&lt;/&gt;</text></svg>">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111713">
+  <meta name="description" content="A calm, local-first deep-work timer and session tracker.">
+  <title>Locked-In — Deep Work System</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-wrapper">
-        <main class="container">
-            
-            <!-- SETUP SCREEN -->
-            <section id="setup-screen" class="screen active">
-                <header class="header">
-                    <span class="badge">v2.0 • Productivity Engine</span>
-                    <h1>🧠 FocusForge</h1>
-                    <p class="subtitle">Set your intent, eliminate friction, and lock in.</p>
-                </header>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Locked-In home">
+        <span class="brand-mark" aria-hidden="true">↗</span>
+        <span><strong>LOCKED-IN</strong><small>DEEP WORK SYSTEM</small></span>
+      </a>
+      <div class="topbar-right">
+        <span class="local-badge"><span class="dot"></span> LOCAL-FIRST</span>
+        <button id="theme-toggle" class="icon-button" type="button" aria-label="Toggle color theme" title="Toggle theme">◐</button>
+      </div>
+    </header>
 
-                <div class="form-card">
-                    <div class="form-group">
-                        <label for="task-intent">Target Goal (Singular Intent)</label>
-                        <input type="text" id="task-intent" placeholder="e.g., Complete Chapter 4 Calculus exercises" autocomplete="off">
-                    </div>
+    <main class="main-content">
+      <section id="setup-screen" class="screen active" aria-labelledby="setup-title">
+        <div class="intro">
+          <p class="eyebrow">MAKE TIME COUNT</p>
+          <h1 id="setup-title">Get into<br><span>deep work.</span></h1>
+          <p class="subtitle">One clear intention. One focused session. A little more progress every day.</p>
+        </div>
 
-                    <div class="form-row">
-                        <div class="form-group flex-1">
-                            <label for="timer-mode">Pacing Protocol</label>
-                            <select id="timer-mode">
-                                <option value="custom">Custom Duration (Hours.Minutes)</option>
-                                <option value="blocks">45-Minute Focus Blocks</option>
-                            </select>
-                        </div>
+        <div class="dashboard-grid">
+          <form id="session-form" class="panel setup-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">YOUR NEXT SESSION</p><h2>Set your intention</h2></div>
+              <span class="step-number">01</span>
+            </div>
 
-                        <div class="form-group flex-1" id="custom-time-inputs">
-                            <label for="time-input">Target Time (HH.MM)</label>
-                            <input type="number" id="time-input" step="0.01" min="0.01" placeholder="2.00">
-                        </div>
+            <div class="field">
+              <label for="task-intent">What will you work on?</label>
+              <input id="task-intent" name="intent" type="text" maxlength="180" placeholder="e.g. Finish the calculus chapter" autocomplete="off">
+              <p class="field-hint">Choose one concrete outcome, not a whole project.</p>
+            </div>
 
-                        <div class="form-group flex-1 hidden" id="block-inputs">
-                            <label for="block-input">45m Blocks Count</label>
-                            <input type="number" id="block-input" min="1" max="12" value="2">
-                        </div>
-                    </div>
-
-                    <div class="checkbox-container">
-                        <label class="custom-checkbox">
-                            <input type="checkbox" id="hardcore-mode">
-                            <span class="checkmark"></span>
-                            <span class="label-text">
-                                💀 <strong>Hardcore Mode:</strong> Any single break exceeding 15 minutes terminates session as an instant failure.
-                            </span>
-                        </label>
-                    </div>
-
-                    <div class="btn-group">
-                        <button id="start-btn" class="btn btn-primary">Start Session</button>
-                        <button id="view-history-btn" class="btn btn-secondary">Session Log</button>
-                    </div>
+            <div class="field">
+              <label>Choose a duration</label>
+              <div class="preset-grid" id="duration-presets" role="group" aria-label="Duration presets">
+                <button type="button" class="preset" data-minutes="15">15 <small>MIN</small></button>
+                <button type="button" class="preset selected" data-minutes="25">25 <small>MIN</small></button>
+                <button type="button" class="preset" data-minutes="45">45 <small>MIN</small></button>
+                <button type="button" class="preset" data-minutes="60">60 <small>MIN</small></button>
+              </div>
+              <div class="custom-duration">
+                <div class="field compact">
+                  <label for="duration-hours">Hours</label>
+                  <input id="duration-hours" type="number" min="0" max="12" value="0" inputmode="numeric">
                 </div>
-            </section>
-
-            <!-- ACTIVE TIMER SCREEN -->
-            <section id="timer-screen" class="screen">
-                <div class="session-header">
-                    <span class="status-indicator" id="status-badge">⚡ FOCUSING</span>
-                    <h2 id="display-intent">Working on: Target Goal</h2>
+                <div class="field compact">
+                  <label for="duration-minutes">Minutes</label>
+                  <input id="duration-minutes" type="number" min="0" max="59" value="25" inputmode="numeric">
                 </div>
+              </div>
+              <p class="field-hint">Choose a preset or enter a custom duration from 1 minute to 12 hours.</p>
+            </div>
 
-                <div class="display-container">
-                    <div class="time-readout" id="time-display">00:00:00</div>
-                    <div class="sub-readout" id="break-display-wrapper">
-                        <span id="break-label">Break Elapsed:</span>
-                        <span id="break-timer">00:00</span>
-                    </div>
-                </div>
+            <div class="field">
+              <label for="session-style">Session style</label>
+              <select id="session-style">
+                <option value="deep-work">Deep work</option>
+                <option value="study">Study</option>
+                <option value="coding">Coding</option>
+                <option value="reading">Reading</option>
+                <option value="writing">Writing</option>
+                <option value="creative">Creative work</option>
+              </select>
+            </div>
 
-                <div class="controls-card">
-                    <button id="break-btn" class="btn btn-warning">☕ Take Break <kbd>b</kbd></button>
-                    <button id="stop-btn" class="btn btn-danger">🛑 End Early <kbd>s</kbd></button>
-                </div>
+            <label class="toggle-row" for="hardcore-mode">
+              <span class="toggle-copy"><strong>Hardcore mode</strong><small>End the session if one break reaches 15 minutes.</small></span>
+              <input id="hardcore-mode" type="checkbox">
+              <span class="toggle-ui" aria-hidden="true"></span>
+            </label>
 
-                <div class="shortcuts-legend">
-                    <span>Keyboard hotkeys enabled: Press <code>b</code> to toggle breaks, <code>s</code> to end.</span>
-                </div>
-            </section>
+            <p id="setup-error" class="error-message" role="alert" hidden></p>
+            <button class="button button-primary button-wide" type="submit">Start focus session <span aria-hidden="true">↗</span></button>
+            <p class="privacy-note"><span aria-hidden="true">◈</span> Your sessions stay in this browser. No account required.</p>
+          </form>
 
-            <!-- REPORT SCREEN -->
-            <section id="report-screen" class="screen">
-                <div class="report-header">
-                    <span class="badge" id="report-type-badge">SESSION COMPLETED</span>
-                    <h1 id="report-title">Final Assessment</h1>
-                    <div class="stars-display" id="stars-display">⭐⭐⭐⭐⭐</div>
-                    <div class="rank-display" id="rank-display">👑 GOD TIER FOCUS</div>
-                </div>
+          <aside class="side-column">
+            <div class="panel stats-panel">
+              <div class="panel-heading"><div><p class="eyebrow">YOUR MOMENTUM</p><h2>This week</h2></div><span class="stats-icon">↗</span></div>
+              <div class="weekly-focus"><strong id="weekly-focus">0h 00m</strong><span>focused</span></div>
+              <div class="stat-divider"></div>
+              <div class="mini-stats">
+                <div><strong id="weekly-sessions">0</strong><span>Sessions</span></div>
+                <div><strong id="weekly-average">—</strong><span>Avg. efficiency</span></div>
+              </div>
+              <div class="week-bars" id="week-bars" aria-label="Focus minutes for the last seven days"></div>
+              <div class="week-labels" id="week-labels"></div>
+            </div>
+            <div class="quote-panel">
+              <span class="quote-mark">“</span>
+              <p>Small, consistent sessions compound into meaningful progress.</p>
+              <span class="quote-caption">THE LOCKED-IN PRINCIPLE</span>
+            </div>
+            <button id="view-history-btn" class="button button-secondary button-wide" type="button">View session history <span aria-hidden="true">→</span></button>
+          </aside>
+        </div>
+      </section>
 
-                <div class="efficiency-card">
-                    <div class="efficiency-header">
-                        <span>Focus Efficiency</span>
-                        <span id="efficiency-percent">100%</span>
-                    </div>
-                    <div class="progress-track">
-                        <div class="progress-fill" id="efficiency-bar"></div>
-                    </div>
-                </div>
+      <section id="timer-screen" class="screen" aria-labelledby="display-intent">
+        <div class="focus-topline">
+          <span id="status-badge" class="status-badge"><span class="dot"></span> FOCUSING</span>
+          <button id="minimize-session-btn" class="text-button" type="button">Back to setup</button>
+        </div>
+        <div class="focus-content">
+          <p class="eyebrow">CURRENT INTENTION</p>
+          <h1 id="display-intent">Your next task</h1>
+          <p id="session-style-label" class="session-style-label">DEEP WORK SESSION</p>
+          <div class="timer-face">
+            <svg class="timer-ring" viewBox="0 0 260 260" role="img" aria-label="Session progress">
+              <circle class="timer-ring-track" cx="130" cy="130" r="116"></circle>
+              <circle id="timer-ring-progress" class="timer-ring-progress" cx="130" cy="130" r="116"></circle>
+            </svg>
+            <div class="timer-center">
+              <span id="time-display" class="time-readout" aria-live="off">25:00</span>
+              <span id="timer-caption" class="timer-caption">TIME TO FOCUS</span>
+            </div>
+          </div>
+          <div id="break-display-wrapper" class="break-panel" hidden>
+            <span>BREAK ELAPSED</span><strong id="break-timer">00:00</strong>
+          </div>
+          <p class="focus-help" id="focus-help">Protect this time. You can take a tracked break whenever you need one.</p>
+          <div class="focus-controls">
+            <button id="break-btn" class="button button-secondary" type="button">Take a break <kbd>B</kbd></button>
+            <button id="stop-btn" class="button button-danger" type="button">End session <kbd>S</kbd></button>
+          </div>
+          <p class="shortcut-note">Keyboard shortcuts: <kbd>B</kbd> toggle break · <kbd>S</kbd> finish early</p>
+        </div>
+      </section>
 
-                <div class="verdict-card">
-                    <p id="judge-verdict">"Exemplary performance."</p>
-                </div>
+      <section id="report-screen" class="screen" aria-labelledby="report-title">
+        <div class="report-hero">
+          <span id="report-type-badge" class="status-badge">SESSION COMPLETED</span>
+          <p class="eyebrow">SESSION REVIEW</p>
+          <h1 id="report-title">You showed up.</h1>
+          <p id="report-subtitle" class="subtitle">Progress is built one session at a time.</p>
+        </div>
+        <div class="report-grid">
+          <div class="panel score-panel">
+            <p class="eyebrow">FOCUS EFFICIENCY</p>
+            <div class="score-row"><strong id="efficiency-percent">100%</strong><span id="stars-display">★★★★★</span></div>
+            <div class="progress-track"><div id="efficiency-bar" class="progress-fill"></div></div>
+            <h2 id="rank-display">Consistent focus</h2>
+            <p id="judge-verdict" class="verdict">Your focus efficiency is calculated from focused time and total session time.</p>
+            <p class="formula-note">Efficiency = focused time ÷ total elapsed time. This measures time use, not learning quality.</p>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-card"><span>FOCUSED TIME</span><strong id="rep-focus">0m 00s</strong></div>
+            <div class="metric-card"><span>ELAPSED TIME</span><strong id="rep-clock">0m 00s</strong></div>
+            <div class="metric-card"><span>BREAKS</span><strong id="rep-breaks">0</strong></div>
+            <div class="metric-card"><span>PLANNED</span><strong id="rep-planned">25m</strong></div>
+          </div>
+        </div>
+        <div class="panel report-details">
+          <p class="eyebrow">WHAT YOU WORKED ON</p>
+          <h2 id="rep-intent">—</h2>
+          <div id="break-breakdown-wrapper" hidden><h3>Break log</h3><ul id="break-breakdown-list"></ul></div>
+          <div class="field reflection-field"><label for="session-reflection">Quick reflection <span>(optional)</span></label><textarea id="session-reflection" rows="3" maxlength="500" placeholder="What went well? What would you change next time?"></textarea></div>
+          <div class="report-actions">
+            <button id="new-session-btn" class="button button-primary" type="button">Start another session ↗</button>
+            <button id="report-history-btn" class="button button-secondary" type="button">View history</button>
+          </div>
+        </div>
+      </section>
 
-                <div class="metrics-grid">
-                    <div class="metric-box">
-                        <span class="label">Intent</span>
-                        <span class="value" id="rep-intent">—</span>
-                    </div>
-                    <div class="metric-box">
-                        <span class="label">Focused Duration</span>
-                        <span class="value" id="rep-focus">00:00:00</span>
-                    </div>
-                    <div class="metric-box">
-                        <span class="label">Real Clock Time</span>
-                        <span class="value" id="rep-clock">00:00:00</span>
-                    </div>
-                    <div class="metric-box">
-                        <span class="label">Breaks Taken</span>
-                        <span class="value" id="rep-breaks">0 (0m 0s)</span>
-                    </div>
-                </div>
-
-                <div class="break-breakdown-card hidden" id="break-breakdown-wrapper">
-                    <h3>Break Log</h3>
-                    <ul id="break-breakdown-list"></ul>
-                </div>
-
-                <div class="btn-group">
-                    <button id="new-session-btn" class="btn btn-primary">Start New Session</button>
-                    <button id="report-history-btn" class="btn btn-secondary">View Full History</button>
-                </div>
-            </section>
-
-            <!-- HISTORY SCREEN -->
-            <section id="history-screen" class="screen">
-                <header class="header">
-                    <span class="badge">Analytics</span>
-                    <h1>📜 Session Archive</h1>
-                    <p class="subtitle">Review your focus efficiency over time.</p>
-                </header>
-
-                <div class="history-controls">
-                    <button id="back-to-setup-btn" class="btn btn-secondary">← Back to Setup</button>
-                    <div class="history-actions">
-                        <button id="export-csv-btn" class="btn btn-secondary">Export CSV</button>
-                        <button id="clear-history-btn" class="btn btn-danger-outline">Clear Log</button>
-                    </div>
-                </div>
-
-                <div class="history-table-wrapper">
-                    <table class="history-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Target Intent</th>
-                                <th>Focus Time</th>
-                                <th>Clock Time</th>
-                                <th>Efficiency</th>
-                                <th>Rating</th>
-                            </tr>
-                        </thead>
-                        <tbody id="history-table-body">
-                            <!-- Injected by JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-        </main>
-    </div>
-
-    <script src="app.js"></script>
+      <section id="history-screen" class="screen" aria-labelledby="history-title">
+        <div class="history-heading">
+          <div><p class="eyebrow">YOUR WORK, OVER TIME</p><h1 id="history-title">Session archive</h1><p class="subtitle">A record of the time you chose to protect.</p></div>
+          <button id="back-to-setup-btn" class="button button-secondary" type="button">← Back</button>
+        </div>
+        <div class="history-summary">
+          <div class="summary-card"><span>TOTAL FOCUS</span><strong id="all-time-focus">0h 00m</strong></div>
+          <div class="summary-card"><span>SESSIONS</span><strong id="all-time-sessions">0</strong></div>
+          <div class="summary-card"><span>AVG. EFFICIENCY</span><strong id="all-time-average">—</strong></div>
+        </div>
+        <div class="history-toolbar">
+          <label class="search-field"><span aria-hidden="true">⌕</span><input id="history-search" type="search" placeholder="Search goals…" aria-label="Search session goals"></label>
+          <div class="history-actions">
+            <button id="export-csv-btn" class="button button-secondary" type="button">Export CSV</button>
+            <button id="export-json-btn" class="button button-secondary" type="button">Backup JSON</button>
+            <label class="button button-secondary import-button" for="import-json-input">Restore backup<input id="import-json-input" type="file" accept="application/json,.json" hidden></label>
+            <button id="clear-history-btn" class="button button-danger-ghost" type="button">Clear history</button>
+          </div>
+        </div>
+        <p id="history-message" class="inline-message" role="status"></p>
+        <div class="history-table-wrapper">
+          <table class="history-table">
+            <thead><tr><th>Date</th><th>Goal</th><th>Focus</th><th>Elapsed</th><th>Efficiency</th><th>Outcome</th></tr></thead>
+            <tbody id="history-table-body"></tbody>
+          </table>
+        </div>
+        <p class="privacy-note">History is saved in this browser only. Export a backup before clearing browser data.</p>
+      </section>
+    </main>
+    <footer class="footer"><span>LOCKED-IN © <span id="current-year"></span></span><span>BUILT FOR INTENTIONAL WORK</span></footer>
+  </div>
+  <script src="app.js" defer></script>
 </body>
 </html>
