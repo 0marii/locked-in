@@ -1,111 +1,76 @@
-Here is a clean, recruiter-ready `README.md` tailored for your repository:
+<div align="center">
 
-```markdown
-# 🧠 FocusForge
+# 🧠 Locked-In
 
-> A brutalist focus manager and accountability engine that tracks deep work, enforces disciplined breaks, and mathematically judges your session efficiency.
+**A brutalist deep-work timer and session manager that grades your study efficiency.**
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Vanilla JS](https://img.shields.io/badge/Vanilla-JavaScript-F7DF1E?logo=javascript&logoColor=black)
-![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-brightgreen)
-![GitHub Pages](https://img.shields.io/badge/Deploy-GitHub_Pages-222222?logo=github)
+[Live Demo](https://0marii.github.io/locked-in/) • [Report Bug](https://github.com/0marii/locked-in/issues) • [Request Feature](https://github.com/0marii/locked-in/issues)
 
-Unlike standard countdown or Pomodoro timers that passively count down, **FocusForge** acts as an impartial arbiter for your study sessions. It tracks real elapsed clock time versus actual focused time, scales efficiency dynamically, ranks your performance across 5 tiers, and logs your session history locally.
+<br />
 
----
+[![Vanilla JS](https://img.shields.io/badge/Vanilla-JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](#)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-brightgreen?style=flat-square)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+[![GitHub Pages](https://img.shields.io/badge/Deploy-GitHub_Pages-24292e?style=flat-square&logo=github)](https://0marii.github.io/locked-in/)
 
-## ⚡ Key Features
-
-- **Singular Task Intent:** Prompts for your exact goal upfront and keeps it pinned on-screen to combat cognitive drift.
-- **Dynamic Session Pacing:** Supports flexible `HH.MM` target durations or modular 45-minute deep-work cycles.
-- **True Efficiency Math:** Calculates real-world focus efficiency:
-  $$\text{Focus Score} = \left(\frac{\text{Actual Focused Time}}{\text{Total Elapsed Clock Time}}\right) \times 100$$
-- **The Arbiter (Dynamic Star & Rank Tiers):** Performance is evaluated and categorized dynamically based on your focus percentage.
-- **💀 Hardcore Mode:** An opt-in strictness toggle. If any single break exceeds 15 minutes, the engine immediately terminates the session with a disqualified score.
-- **Synthesized Audio Alerts:** Utilizes the browser's native **Web Audio API** to generate multi-frequency chimes and buzzers without external audio files or network requests.
-- **Keyboard-First Interface:** Global hotkeys allow starting, pausing, break tracking, and early stops without reaching for a mouse.
-- **Persistent Analytics & CSV Export:** Stores complete session logs in `localStorage` and provides one-click CSV report exports.
+</div>
 
 ---
 
-## ⌨️ Controls & Shortcuts
+## ⚡ What Makes It Different?
 
-| Key | Action | Description |
-| :--- | :--- | :--- |
-| <kbd>b</kbd> | **Toggle Tracked Break** | Pauses focus countdown, starts break stopwatch, and logs break duration. |
-| <kbd>s</kbd> | **Stop Session Early** | Closes active timer and immediately generates an efficiency report. |
+Most timers passively count down without tracking actual cognitive output. **Locked-In** acts as an active accountability arbiter:
 
-*(Keyboard hotkeys automatically ignore input when typing inside text boxes).*
+- **True Efficiency Tracking** — Tracks actual focused work against real-world clock time (accounting for pauses, interruptions, and break creep).
+- **Dynamic Star Ratings** — Calculates a percentile efficiency score and rates your session from 1 to 5 stars.
+- **💀 Hardcore Mode** — High-stakes discipline. Any single break exceeding 15 minutes instantly terminates and disqualifies the session.
+- **Synthesized Audio** — Procedurally generates sound effects (success chimes and penalty buzzers) via the native browser Web Audio API—no external audio files or network requests required.
+- **Persistent Analytics** — Automatically stores session metrics in `localStorage` and provides instant CSV export for performance logging.
 
 ---
 
-## 🏆 Scoring & Rank Breakdown
+## 📐 The Efficiency Formula
 
-| Efficiency Score | Rating | Rank Title | Verdict |
+$$\text{Focus Score (\%)} = \left( \frac{\text{Actual Focused Time}}{\text{Total Elapsed Clock Time}} \right) \times 100$$
+
+> **Example:** If you set a 2-hour target session and accumulate 30 minutes of total breaks, your session took 2.5 hours of clock time. Your Focus Score is **80%** (2h focused / 2.5h total elapsed).
+
+---
+
+## 🏆 Ranks & Rating System
+
+| Efficiency | Rating | Rank | Verdict |
 | :---: | :---: | :--- | :--- |
-| **≥ 96%** | ⭐⭐⭐⭐⭐ | **👑 GOD TIER FOCUS** | Flawless discipline; negligible idle time. |
-| **89% – 95%** | ⭐⭐⭐⭐ | **🔥 ELITE SCHOLAR** | Highly productive with structured, timely breathers. |
-| **80% – 88%** | ⭐⭐⭐ | **⚖️ BALANCED WORKER** | Solid output, but prone to minor break creep. |
+| **≥ 96%** | ⭐⭐⭐⭐⭐ | **👑 GOD TIER FOCUS** | Flawless execution. Minimal idle time. |
+| **89% – 95%** | ⭐⭐⭐⭐ | **🔥 ELITE SCHOLAR** | Highly productive with structured breathers. |
+| **80% – 88%** | ⭐⭐⭐ | **⚖️ BALANCED WORKER** | Solid output, but break creep was noticeable. |
 | **66% – 79%** | ⭐⭐ | **🥱 DISTRACTED WANDERER** | Excessive time away from target work. |
 | **< 66%** | ⭐ | **🤡 PROCRASTINATOR** | Clock ran while checked out. |
-| *Break > 15m* | 0 Stars | **💀 HARDCORE CASUALTY** | Automatic disqualification under Hardcore rules. |
+| *Break > 15m* | 0 Stars | **💀 HARDCORE CASUALTY** | Disqualified under Hardcore rules. |
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## ⌨️ Controls & Hotkeys
 
-- **HTML5:** Semantic architecture with an accessible single-page multi-screen layout.
-- **CSS3:** Custom properties (CSS variables), modern flexbox/grid architectures, and dark terminal aesthetic optimized for deep work.
-- **Vanilla JavaScript (ES6+):** 
-  - Zero external frameworks or runtime dependencies.
-  - Native **Web Audio API** (`AudioContext`, `OscillatorNode`, `GainNode`) for procedural sound synthesis.
-  - Native **Web Storage API** (`localStorage`) for persistence.
-  - Blob-driven CSV generation for instant client-side data export.
+| Key | Action | Description |
+| :---: | :--- | :--- |
+| <kbd>B</kbd> | **Tracked Break** | Pauses focus countdown, starts a live break stopwatch, and logs duration. |
+| <kbd>S</kbd> | **Stop Session** | Terminates session early and instantly renders the evaluation report. |
 
 ---
 
-## 🚀 Quickstart & Local Setup
+## 🚀 Local Setup
 
-No node runtime, package manager, or build steps required.
+No bundlers, package managers, or Node runtimes required.
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/YOUR_USERNAME/focus-forge.git](https://github.com/YOUR_USERNAME/focus-forge.git)
-   cd focus-forge
-
-```
-
-2. **Run locally:**
-Open `index.html` in any modern web browser:
 ```bash
-# On macOS
-open index.html
+# Clone the repository
+git clone [https://github.com/0marii/locked-in.git](https://github.com/0marii/locked-in.git)
 
-# On Linux
-xdg-open index.html
+# Enter the project directory
+cd locked-in
 
-# On Windows
-start index.html
-
-```
-
-
-
----
-
-## 🌐 Deploy to GitHub Pages
-
-1. Push the code to your GitHub repository.
-2. In your repository, go to **Settings** > **Pages**.
-3. Under **Build and deployment > Branch**, select `main` (or `master`) and set the folder to `/(root)`.
-4. Click **Save**. Your study manager will be live on the web in seconds.
-
----
-
-## 📄 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
-```
-
-```
+# Open directly in your browser
+open index.html        # macOS
+xdg-open index.html    # Linux
+start index.html       # Windows
