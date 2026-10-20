@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusForge | Elite Study Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-wrapper">
+        <main class="container">
+            
+            <!-- SETUP SCREEN -->
+            <section id="setup-screen" class="screen active">
+                <header class="header">
+                    <span class="badge">v2.0 • Productivity Engine</span>
+                    <h1>🧠 FocusForge</h1>
+                    <p class="subtitle">Set your intent, eliminate friction, and lock in.</p>
+                </header>
+
+                <div class="form-card">
+                    <div class="form-group">
+                        <label for="task-intent">Target Goal (Singular Intent)</label>
+                        <input type="text" id="task-intent" placeholder="e.g., Complete Chapter 4 Calculus exercises" autocomplete="off">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label for="timer-mode">Pacing Protocol</label>
+                            <select id="timer-mode">
+                                <option value="custom">Custom Duration (Hours.Minutes)</option>
+                                <option value="blocks">45-Minute Focus Blocks</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group flex-1" id="custom-time-inputs">
+                            <label for="time-input">Target Time (HH.MM)</label>
+                            <input type="number" id="time-input" step="0.01" min="0.01" placeholder="2.00">
+                        </div>
+
+                        <div class="form-group flex-1 hidden" id="block-inputs">
+                            <label for="block-input">45m Blocks Count</label>
+                            <input type="number" id="block-input" min="1" max="12" value="2">
+                        </div>
+                    </div>
+
+                    <div class="checkbox-container">
+                        <label class="custom-checkbox">
+                            <input type="checkbox" id="hardcore-mode">
+                            <span class="checkmark"></span>
+                            <span class="label-text">
+                                💀 <strong>Hardcore Mode:</strong> Any single break exceeding 15 minutes terminates session as an instant failure.
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="btn-group">
+                        <button id="start-btn" class="btn btn-primary">Start Session</button>
+                        <button id="view-history-btn" class="btn btn-secondary">Session Log</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ACTIVE TIMER SCREEN -->
+            <section id="timer-screen" class="screen">
+                <div class="session-header">
+                    <span class="status-indicator" id="status-badge">⚡ FOCUSING</span>
+                    <h2 id="display-intent">Working on: Target Goal</h2>
+                </div>
+
+                <div class="display-container">
+                    <div class="time-readout" id="time-display">00:00:00</div>
+                    <div class="sub-readout" id="break-display-wrapper">
+                        <span id="break-label">Break Elapsed:</span>
+                        <span id="break-timer">00:00</span>
+                    </div>
+                </div>
+
+                <div class="controls-card">
+                    <button id="break-btn" class="btn btn-warning">☕ Take Break <kbd>b</kbd></button>
+                    <button id="stop-btn" class="btn btn-danger">🛑 End Early <kbd>s</kbd></button>
+                </div>
+
+                <div class="shortcuts-legend">
+                    <span>Keyboard hotkeys enabled: Press <code>b</code> to toggle breaks, <code>s</code> to end.</span>
+                </div>
+            </section>
+
+            <!-- REPORT SCREEN -->
+            <section id="report-screen" class="screen">
+                <div class="report-header">
+                    <span class="badge" id="report-type-badge">SESSION COMPLETED</span>
+                    <h1 id="report-title">Final Assessment</h1>
+                    <div class="stars-display" id="stars-display">⭐⭐⭐⭐⭐</div>
+                    <div class="rank-display" id="rank-display">👑 GOD TIER FOCUS</div>
+                </div>
+
+                <div class="efficiency-card">
+                    <div class="efficiency-header">
+                        <span>Focus Efficiency</span>
+                        <span id="efficiency-percent">100%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="efficiency-bar"></div>
+                    </div>
+                </div>
+
+                <div class="verdict-card">
+                    <p id="judge-verdict">"Exemplary performance."</p>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <span class="label">Intent</span>
+                        <span class="value" id="rep-intent">—</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="label">Focused Duration</span>
+                        <span class="value" id="rep-focus">00:00:00</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="label">Real Clock Time</span>
+                        <span class="value" id="rep-clock">00:00:00</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="label">Breaks Taken</span>
+                        <span class="value" id="rep-breaks">0 (0m 0s)</span>
+                    </div>
+                </div>
+
+                <div class="break-breakdown-card hidden" id="break-breakdown-wrapper">
+                    <h3>Break Log</h3>
+                    <ul id="break-breakdown-list"></ul>
+                </div>
+
+                <div class="btn-group">
+                    <button id="new-session-btn" class="btn btn-primary">Start New Session</button>
+                    <button id="report-history-btn" class="btn btn-secondary">View Full History</button>
+                </div>
+            </section>
+
+            <!-- HISTORY SCREEN -->
+            <section id="history-screen" class="screen">
+                <header class="header">
+                    <span class="badge">Analytics</span>
+                    <h1>📜 Session Archive</h1>
+                    <p class="subtitle">Review your focus efficiency over time.</p>
+                </header>
+
+                <div class="history-controls">
+                    <button id="back-to-setup-btn" class="btn btn-secondary">← Back to Setup</button>
+                    <div class="history-actions">
+                        <button id="export-csv-btn" class="btn btn-secondary">Export CSV</button>
+                        <button id="clear-history-btn" class="btn btn-danger-outline">Clear Log</button>
+                    </div>
+                </div>
+
+                <div class="history-table-wrapper">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Target Intent</th>
+                                <th>Focus Time</th>
+                                <th>Clock Time</th>
+                                <th>Efficiency</th>
+                                <th>Rating</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Injected by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
