@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#111713">
   <meta name="description" content="A calm, local-first deep-work timer and session tracker.">
   <title>Locked-In — Deep Work System</title>
+  <!-- Reuse the creator's published portfolio mark as the browser favicon. -->
+  <link rel="icon" type="image/png" href="https://omari.vercel.app/Images/logo.png">
+  <link rel="apple-touch-icon" href="https://omari.vercel.app/Images/logo.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,6 +19,11 @@
         <span><strong>LOCKED-IN</strong><small>DEEP WORK SYSTEM</small></span>
       </a>
       <div class="topbar-right">
+        <nav class="header-links" aria-label="Creator links">
+          <a href="https://omari.vercel.app/" target="_blank" rel="noopener noreferrer">Creator <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/0marii/locked-in" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a>
+          <a href="mailto:mo.omari862@gmail.com">Contact</a>
+        </nav>
         <span class="local-badge"><span class="dot"></span> LOCAL-FIRST</span>
         <button id="theme-toggle" class="icon-button" type="button" aria-label="Toggle color theme" title="Toggle theme">◐</button>
       </div>
@@ -203,7 +211,25 @@
         <p class="privacy-note">History is saved in this browser only. Export a backup before clearing browser data.</p>
       </section>
     </main>
-    <footer class="footer"><span>LOCKED-IN © <span id="current-year"></span></span><span>BUILT FOR INTENTIONAL WORK</span></footer>
+    <footer class="footer">
+      <div class="footer-brand">
+        <span class="footer-mark" aria-hidden="true">↗</span>
+        <div>
+          <strong>LOCKED-IN</strong>
+          <span>Built for intentional work.</span>
+        </div>
+      </div>
+      <div class="footer-credit">
+        <span>Designed and built by <a href="https://omari.vercel.app/" target="_blank" rel="noopener noreferrer">Mohammed Al-Omari</a></span>
+        <span>© <span id="current-year"></span> · All sessions stay in your browser.</span>
+      </div>
+      <nav class="footer-links" aria-label="Contact and project links">
+        <a href="mailto:mo.omari862@gmail.com">Email</a>
+        <a href="https://github.com/0marii/locked-in" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://www.linkedin.com/in/mohammad-al-omari-49b99311b/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+        <a href="https://omari.vercel.app/" target="_blank" rel="noopener noreferrer">Portfolio</a>
+      </nav>
+    </footer>
   </div>
   <script src="app.js" defer></script>
 </body>
