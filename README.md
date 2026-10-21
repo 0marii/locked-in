@@ -75,5 +75,4 @@ In Hardcore mode, a single break longer than 15 minutes ends the session as a fa
 The page includes a descriptive title, meta description, canonical URL, Open Graph/Twitter metadata, JSON-LD structured data, a sitemap, and a robots file. These make the site easier for crawlers and social previews to understand but do not guarantee indexing or rankings. GitHub Pages is static hosting, so the initial HTML should keep meaningful content and metadata without requiring JavaScript to populate it.
 
 ## License
-
-Use the license already present in the repository if it differs from this package. If the repository does not have a license, add one before accepting external contributions or reuse.
+MIT
