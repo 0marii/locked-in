@@ -9,15 +9,17 @@
   <link rel="canonical" href="https://0marii.github.io/locked-in/">
   <title>Locked-In — Focus Timer & Deep Work Tracker</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <meta name="author" content="Mohammad Al Omari">
+  <meta name="author" content="Mohammad Al-Omari">
   <meta name="color-scheme" content="dark light">
-  <link rel="stylesheet" href="./style.css?v=4">
+  <link rel="stylesheet" href="./style.css?v=6">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Locked-In">
   <meta property="og:title" content="Locked-In — Focus Timer & Deep Work Tracker">
   <meta property="og:description" content="Choose a goal, focus on one thing, track breaks, and review your sessions.">
   <meta property="og:url" content="https://0marii.github.io/locked-in/">
+  <meta property="og:image" content="https://0marii.github.io/locked-in/og-image.svg">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://0marii.github.io/locked-in/og-image.svg">
   <meta name="twitter:title" content="Locked-In — Focus Timer & Deep Work Tracker">
   <meta name="twitter:description" content="A customizable focus timer for deliberate deep work.">
   <script type="application/ld+json">
@@ -32,7 +34,7 @@
     "browserRequirements": "Requires JavaScript and local storage."
   }
   </script>
-  <script src="./app.js?v=4" defer></script>
+  <script src="./app.js?v=6" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -50,6 +52,7 @@
     <nav class="site-nav" id="site-nav" aria-label="Main navigation">
       <button class="nav-link is-active" type="button" data-screen="setup-screen">Focus</button>
       <button class="nav-link" type="button" data-screen="history-screen">Session history</button>
+      <button class="nav-link" id="sticky-notes-nav" type="button">Sticky notes</button>
       <a class="nav-link" href="#about">About</a>
       <label class="theme-control" for="theme-select">
         <span>Theme</span>
@@ -59,6 +62,7 @@
           <option value="forest">Forest</option>
           <option value="violet">Violet</option>
           <option value="pink">Pink</option>
+          <option value="blue">Blue</option>
         </select>
       </label>
     </nav>
@@ -182,11 +186,11 @@
       </div>
       <div class="panel report-panel">
         <div class="score-row">
-          <div><span class="metric-label">FOCUS TIME RATIO</span><strong class="score-number" id="efficiency-percent">100%</strong></div>
+          <div><span class="metric-label">FOCUS SCORE</span><strong class="score-number" id="efficiency-percent">100%</strong></div>
           <span class="score-caption" id="rank-display">Strong effort</span>
         </div>
         <div class="progress-track"><span id="efficiency-bar"></span></div>
-        <p class="metric-explanation">Focused time ÷ total elapsed time. This measures time allocation, not the quality of your concentration.</p>
+        <p class="metric-explanation">Score rewards completing at least 70% of planned focus time and subtracts penalties for breaks. It is a time-based estimate, not a measure of concentration quality.</p>
         <div class="metrics-grid">
           <div class="metric-box"><span class="metric-label">YOUR GOAL</span><strong id="rep-intent">—</strong></div>
           <div class="metric-box"><span class="metric-label">FOCUSED TIME</span><strong id="rep-focus">00:00</strong></div>
@@ -196,8 +200,8 @@
         <section class="session-notes-card" aria-labelledby="session-notes-title">
           <h2 id="session-notes-title">What did you work on?</h2>
           <p>Capture topics, progress, and what you want to continue next time.</p>
-          <div class="field"><label for="session-topic">Topics / things worked on</label><input id="session-topic" maxlength="240" placeholder="e.g. Redis streams, consumers, TypeScript"></div>
-          <div class="field"><label for="session-notes">Notes</label><textarea id="session-notes" rows="4" maxlength="4000" placeholder="What did you do, learn, or want to remember?"></textarea></div>
+          <div class="field"><label for="session-topic">Topics / things worked on</label><input id="session-topic" maxlength="240" placeholder="e.g. Redis streams, consumers, TypeScript"><button class="button button-secondary editor-save" id="save-topic-btn" type="button" disabled>Save topic</button><span class="save-state" id="topic-save-state" aria-live="polite">No unsaved changes</span></div>
+          <div class="field"><label for="session-notes">Notes</label><textarea id="session-notes" rows="4" maxlength="4000" placeholder="What did you do, learn, or want to remember?"></textarea><button class="button button-secondary editor-save" id="save-notes-btn" type="button" disabled>Save notes</button><span class="save-state" id="notes-save-state" aria-live="polite">No unsaved changes</span></div>
           <p class="field-hint" id="notes-save-status" aria-live="polite">Notes are saved with this session when you finish.</p>
         </section>
         <div class="break-breakdown-card is-hidden" id="break-breakdown-wrapper">
@@ -219,7 +223,7 @@
       <div class="history-summary">
         <div class="panel summary-card"><span class="metric-label">SESSIONS</span><strong id="history-session-count">0</strong></div>
         <div class="panel summary-card"><span class="metric-label">FOCUS TIME</span><strong id="history-total-focus">0m</strong></div>
-        <div class="panel summary-card"><span class="metric-label">AVG. TIME RATIO</span><strong id="history-average">—</strong></div>
+        <div class="panel summary-card"><span class="metric-label">AVG. FOCUS SCORE</span><strong id="history-average">—</strong></div>
       </div>
       <div class="history-toolbar">
         <label class="search-field" for="history-search"><span aria-hidden="true">⌕</span><input id="history-search" type="search" placeholder="Search goals, topics, or notes…" autocomplete="off"></label>
@@ -234,7 +238,7 @@
         <div class="table-scroll">
           <table class="history-table">
             <caption class="visually-hidden">Saved focus sessions, including goals, notes, time, and outcomes</caption>
-            <thead><tr><th scope="col">Date</th><th scope="col">Goal</th><th scope="col">Topics / work</th><th scope="col">Notes</th><th scope="col">Focus</th><th scope="col">Elapsed</th><th scope="col">Time ratio</th><th scope="col">Outcome</th><th scope="col">Actions</th></tr></thead>
+            <thead><tr><th scope="col">Date</th><th scope="col">Goal</th><th scope="col">Topics / work</th><th scope="col">Notes</th><th scope="col">Focus</th><th scope="col">Elapsed</th><th scope="col">Focus score</th><th scope="col">Outcome</th><th scope="col">Actions</th></tr></thead>
             <tbody id="history-table-body"></tbody>
           </table>
         </div>
@@ -262,12 +266,28 @@
       <span>© <span id="current-year"></span> Locked-In</span>
       <span>Built for deliberate work.</span>
       <div class="footer-feedback" aria-label="Feedback and contact"><a href="https://github.com/0marii/locked-in/issues/new?labels=enhancement&" target="_blank" rel="noopener noreferrer">Request a feature ↗</a><a href="https://github.com/0marii/locked-in/issues/new?labels=bug&" target="_blank" rel="noopener noreferrer">Report a bug ↗</a><a href="mailto:mo.omari862@gmail.com">mo.omari862@gmail.com</a></div>
-      <a href="https://github.com/0marii" target="_blank" rel="noopener noreferrer">Made by 0marii ↗</a>
+      <div class="creator-credit">Made by <a href="https://github.com/0marii" target="_blank" rel="noopener noreferrer">Mohammad Al-Omari</a><div class="social-links" aria-label="Social links"><a class="social" href="https://jo.linkedin.com/in/alomari-se" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M5.2 3.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM3.4 9.4H7v11.2H3.4zM9.2 9.4h3.4v1.5h.1a3.7 3.7 0 0 1 3.3-1.8c3.5 0 4.2 2.2 4.2 5.1v6.4h-3.6v-5.7c0-1.4 0-3.1-1.9-3.1s-2.1 1.5-2.1 3v5.8H9.2z"/></svg></a><a class="social" href="https://github.com/0marii" aria-label="GitHub" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.5-1.3-1.3-1.6-1.3-1.6-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.3.8 1 .8 2v3c0 .4.2.7.8.6A11.1 11.1 0 0 0 12 .9Z"/></svg></a><a class="social" href="https://omari.vercel.app/" aria-label="Portfolio" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 4.2L18.1 18H5.9L12 6.2Z"/></svg></a><a class="social" href="mailto:mo.omari862@gmail.com" aria-label="Email"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M2 5h20v14H2V5Zm2 2v.5l8 5.3 8-5.3V7l-8 5.2L4 7Z"/></svg></a></div></div>
     </footer>
   </main>
 
   <button class="back-to-top" id="back-to-top" type="button" aria-label="Back to top" title="Back to top">↑</button>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="edit-session-dialog" id="edit-session-dialog" aria-labelledby="edit-session-heading">
+    <form id="edit-session-form" class="edit-session-content">
+      <p class="eyebrow">SESSION NOTES</p>
+      <h2 id="edit-session-heading">Edit your session</h2>
+      <label for="edit-session-title">Topics / things worked on</label>
+      <input id="edit-session-title" class="edit-session-title" maxlength="240" placeholder="e.g. Redis streams, TypeScript">
+      <label for="edit-session-notes">Notes</label>
+      <textarea id="edit-session-notes" class="edit-session-notes" rows="4" maxlength="4000" placeholder="What did you work on or learn?"></textarea>
+      <div class="dialog-actions">
+        <button class="button button-danger" id="edit-session-delete" type="button">Delete session</button>
+        <span class="dialog-action-spacer"></span>
+        <button class="button button-secondary" type="button" id="edit-session-cancel">Cancel</button>
+        <button class="button button-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  </dialog>
   <dialog class="confirm-dialog" id="confirm-dialog" aria-labelledby="confirm-title">
     <form method="dialog" class="confirm-content">
       <p class="eyebrow">PLEASE CONFIRM</p><h2 id="confirm-title">End this session?</h2>

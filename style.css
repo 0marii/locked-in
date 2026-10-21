@@ -334,3 +334,58 @@ body.is-history .about-section { display: none; }
   .site-footer { align-items: flex-start; flex-direction: column; }
   .footer-feedback { gap: 12px; }
 }
+
+
+:root[data-theme="blue"] {
+  color-scheme: dark;
+  --bg:#0b1424; --surface:#111f34; --surface-raised:#192b45; --surface-soft:#213854;
+  --text:#f0f6ff; --text-muted:#b1c5df; --text-subtle:#9ab0cd; --border:#35506f;
+  --accent:#73baff; --accent-strong:#4da4f5; --accent-ink:#07182a; --danger:#ffaaa7;
+  --danger-bg:rgba(255,91,79,.14); --warning:#ffd27d; --shadow:0 24px 80px rgba(0,0,0,.28);
+}
+.editor-save { margin-top:8px; }
+.editor-save:disabled { opacity:.45; cursor:not-allowed; }
+.save-state { display:inline-block; margin:8px 0 0 10px; font-size:12px; color:var(--text-muted); }
+.save-state[data-state="dirty"] { color:var(--warning); }
+.save-state[data-state="saved"] { color:var(--accent); }
+.save-state[data-state="error"] { color:var(--danger); }
+.social-links { display:inline-flex; align-items:center; gap:12px; margin-left:12px; vertical-align:middle; }
+.social { display:inline-flex; color:var(--text-muted); transition:color .2s ease,transform .2s ease; }
+.social:hover,.social:focus-visible { color:var(--accent); transform:translateY(-2px); }
+.creator-credit { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px; }
+.creator-credit > a { color:var(--text); text-decoration-color:var(--accent); }
+.sticky-notes-panel { position:fixed; z-index:1000; right:22px; bottom:22px; width:min(340px,calc(100vw - 28px)); padding:16px; border:1px solid var(--border); border-radius:16px; background:var(--surface-raised); color:var(--text); box-shadow:var(--shadow); display:none; }
+.sticky-notes-panel.is-open { display:block; }
+.sticky-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.sticky-close { border:0; background:transparent; color:var(--text); font-size:24px; }
+.sticky-notes-panel p { color:var(--text-muted); font-size:13px; }
+.sticky-notes-panel textarea { width:100%; min-height:100px; resize:vertical; margin:8px 0; border:1px solid var(--border); border-radius:10px; padding:10px; background:var(--bg); color:var(--text); }
+.sticky-notes-panel textarea:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.sticky-notes-panel ul { padding-left:20px; max-height:150px; overflow:auto; }
+:root[data-theme="pink"] .panel, :root[data-theme="pink"] input, :root[data-theme="pink"] textarea, :root[data-theme="pink"] select,
+:root[data-theme="blue"] .panel, :root[data-theme="blue"] input, :root[data-theme="blue"] textarea, :root[data-theme="blue"] select { color:var(--text); }
+
+
+/* Accessible score explanations: native tooltips plus a clear hover/focus affordance. */
+#efficiency-percent[title], .history-table td[title], .outcome-pill[title], #rank-display[title] {
+  cursor: help;
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: .2em;
+}
+#efficiency-percent:focus-visible, .history-table td[tabindex="0"]:focus-visible, .outcome-pill[tabindex="0"]:focus-visible, #rank-display:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* Theme-aware session editor modal */
+.edit-session-dialog { width: min(620px, calc(100% - 28px)); max-height: min(85vh, 760px); overflow: auto; padding: 0; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.edit-session-dialog::backdrop { background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(6px); }
+.edit-session-content { padding: clamp(20px, 4vw, 32px); display: flex; flex-direction: column; gap: 10px; }
+.edit-session-content h2 { margin: 0 0 8px; font-size: clamp(24px, 4vw, 32px); letter-spacing: -.04em; }
+.edit-session-content label { margin-top: 8px; color: var(--text-muted); font-size: 12px; font-weight: 700; }
+.edit-session-title, .edit-session-notes { width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; background: var(--surface-raised, var(--bg)); color: var(--text); font: inherit; outline: none; transition: border-color .18s, box-shadow .18s; }
+.edit-session-title { font-size: 19px; font-weight: 650; }
+.edit-session-notes { resize: vertical; min-height: 130px; line-height: 1.6; }
+.edit-session-title:focus, .edit-session-notes:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring, color-mix(in srgb, var(--accent) 28%, transparent)); }
+.dialog-action-spacer { flex: 1; }
+@media (max-width: 560px) { .edit-session-content .dialog-actions { flex-wrap: wrap; } .dialog-action-spacer { display: none; } .edit-session-content .dialog-actions .button { flex: 1 1 auto; } }

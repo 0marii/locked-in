@@ -12,14 +12,17 @@ A customizable, browser-based focus timer and deep-work tracker. Built with vani
 - Standard and optional Hardcore session styles.
 - Timestamp-based countdown calculations to reduce timer drift when the browser throttles interval callbacks.
 - Break tracking and a consistent 15-minute Hardcore break limit.
-- Session report with focused time, elapsed time, break time, focus-time ratio, editable topics, and notes.
+- Focus score requires at least 70% of planned focus time; break duration and excess break count reduce the score.
+- Hardcore sessions exceeding 15 minutes of cumulative break time fail and receive no score.
+- Session topics and notes have explicit save states; sticky notes can be added during a session and are merged into its notes.
+- Session report with focused time, elapsed time, break time, a scored focus metric, editable topics, and notes.
 - Notes and topics are preserved in local history, shown in reports and searchable in session history.
 - Resume an active timer after refreshing or reopening the page.
 - Edit session notes or delete individual history records.
 - Import JSON backups and merge records by session ID.
 - Searchable local session history.
 - CSV export and JSON backup.
-- Five themes: Dark, Light, Forest, Violet, and Pink.
+- Six themes: Dark, Light, Forest, Violet, Pink, and Blue.
 - Responsive layout with a mobile hamburger navigation menu.
 - Keyboard shortcuts: `B` toggles a break and `S` ends a session while the timer screen is active.
 - SEO metadata, canonical URL, Open Graph metadata, JSON-LD, `robots.txt`, and sitemap.
