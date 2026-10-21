@@ -1,24 +1,16 @@
-# Locked-In update notes
+# Locked-In update notes — History and navigation fixes
 
-## Included changes
+- Fixed the brand logo navigation so it returns to the Focus/setup screen, and cache-busted the stylesheet and application script with `?v=4` for GitHub Pages deployments.
+- Made the floating back-to-top button initialize its visibility on page load, show after 240px of scrolling, and remain keyboard-inaccessible while hidden.
+- Added footer links for requesting a feature and reporting a bug through GitHub Issues, alongside the configured contact email.
+- Corrected history summary and insight averages to use a time-weighted focus ratio (total focus / total elapsed).
+- Kept the history table's nine columns aligned with its nine rendered cells and improved full-width horizontal scrolling, wrapping, action-column sizing, and mobile toolbar layout.
+- Clarified search to include goals, topics, and notes; hid About content while viewing History; improved report/chart panel spacing and heading tracking.
+- Retained static GitHub Pages compatibility: no server-side requirements or build step added.
 
-- Added the Pink theme to the theme selector and CSS design tokens.
-- Kept existing theme persistence and updated theme-color metadata through the existing theme logic.
-- Added a fixed, accessible back-to-top button that appears after scrolling beyond 420px.
-- Back-to-top respects the user's reduced-motion preference.
-- Improved theme selector sizing and mobile navigation menu scrolling.
-- Added restrained hover/focus feedback and extra focus-visible styles.
-- Replaced placeholder `feedback@example.com` mail links with GitHub issue creation links.
-- Added a Node built-in smoke-test suite and npm scripts; no runtime dependencies were added.
-- Updated README feature list, file tree, test instructions, and Lighthouse caveats.
-
-## Verification performed
+## Checks run
 
 - `node --check app.js` — passed.
-- `node --check locked-in-enhancements.js` — passed.
-- `npm test` — 5 tests passed.
-- Static HTML check — no duplicate IDs, no unmatched label targets, and no missing local asset references found.
+- `node --test tests/static-contract.test.cjs` — 8 tests passed.
 
-## Not claimed
-
-A full browser-driven end-to-end run and Lighthouse audits were not completed in this environment. Therefore, no Lighthouse score of 100 is claimed. After deployment, test timer start/break/resume/end, session history, exports/imports, themes, and mobile navigation in a real browser and run Lighthouse on both mobile and desktop.
+Browser-based end-to-end testing and Lighthouse audits were not run in this environment.

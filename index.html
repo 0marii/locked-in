@@ -11,7 +11,7 @@
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <meta name="author" content="Mohammad Al Omari">
   <meta name="color-scheme" content="dark light">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=4">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Locked-In">
   <meta property="og:title" content="Locked-In — Focus Timer & Deep Work Tracker">
@@ -32,13 +32,13 @@
     "browserRequirements": "Requires JavaScript and local storage."
   }
   </script>
-  <script src="./app.js" defer></script>
+  <script src="./app.js?v=4" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <header class="site-header">
-    <a class="brand" href="#setup" aria-label="Locked-In home">
+    <a class="brand" href="./#setup" aria-label="Locked-In home">
       <span class="brand-mark" aria-hidden="true">LI</span>
       <span class="brand-copy"><strong>Locked-In</strong><small>FOCUS WITH INTENTION</small></span>
     </a>
@@ -222,7 +222,7 @@
         <div class="panel summary-card"><span class="metric-label">AVG. TIME RATIO</span><strong id="history-average">—</strong></div>
       </div>
       <div class="history-toolbar">
-        <label class="search-field" for="history-search"><span aria-hidden="true">⌕</span><input id="history-search" type="search" placeholder="Search your goals…" autocomplete="off"></label>
+        <label class="search-field" for="history-search"><span aria-hidden="true">⌕</span><input id="history-search" type="search" placeholder="Search goals, topics, or notes…" autocomplete="off"></label>
         <div class="history-actions">
           <button class="button button-secondary button-small" id="export-csv-btn" type="button">Export CSV</button>
           <button class="button button-secondary button-small" id="export-json-btn" type="button">Backup JSON</button>
@@ -261,7 +261,8 @@
     <footer class="site-footer">
       <span>© <span id="current-year"></span> Locked-In</span>
       <span>Built for deliberate work.</span>
-      <a href="mailto:mo.omari862@gmail.com">mo.omari862@gmail.com</a> <a href="https://github.com/0marii" target="_blank" rel="noopener noreferrer">Made by 0marii ↗</a>
+      <div class="footer-feedback" aria-label="Feedback and contact"><a href="https://github.com/0marii/locked-in/issues/new?labels=enhancement&" target="_blank" rel="noopener noreferrer">Request a feature ↗</a><a href="https://github.com/0marii/locked-in/issues/new?labels=bug&" target="_blank" rel="noopener noreferrer">Report a bug ↗</a><a href="mailto:mo.omari862@gmail.com">mo.omari862@gmail.com</a></div>
+      <a href="https://github.com/0marii" target="_blank" rel="noopener noreferrer">Made by 0marii ↗</a>
     </footer>
   </main>
 

@@ -298,3 +298,39 @@ body.is-focusing .about-section, body.is-focusing .site-footer { display: none; 
 .active-session-banner strong { font-size: 15px; }
 .active-session-banner p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
 @media(max-width:520px){ .active-session-banner { align-items: stretch; flex-direction: column; } }
+
+
+/* History/report layout corrections (v4). */
+.history-panel { width: 100%; min-width: 0; }
+.table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+.history-table { width: 100%; min-width: 1120px; table-layout: auto; }
+.history-table th, .history-table td { vertical-align: top; }
+.history-table td:nth-child(3), .history-table td:nth-child(4) { white-space: normal; min-width: 150px; max-width: 260px; overflow-wrap: anywhere; line-height: 1.5; }
+.history-table td:nth-child(1) { min-width: 155px; }
+.history-table td:nth-child(2) { min-width: 120px; white-space: normal; overflow-wrap: anywhere; }
+.history-table td:nth-child(5), .history-table td:nth-child(6), .history-table td:nth-child(7) { font-variant-numeric: tabular-nums; }
+.history-table td:last-child { min-width: 160px; white-space: normal; }
+.history-table td:last-child .button { min-height: 36px; }
+.history-toolbar { align-items: center; }
+.history-actions { align-items: center; justify-content: flex-end; }
+.analysis-panel { display: block; width: 100%; min-width: 0; margin: 24px 0; padding: clamp(20px, 3vw, 32px); overflow: hidden; }
+.analysis-heading { padding: 0; margin-bottom: 20px; }
+.analysis-heading h2 { letter-spacing: -.025em; }
+.analysis-heading .local-data-note { line-height: 1.5; }
+.history-table caption.visually-hidden { position: absolute !important; }
+.footer-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.footer-feedback a { color: var(--text-muted); text-decoration: none; }
+.footer-feedback a:hover { color: var(--accent); text-decoration: underline; }
+.site-footer { align-items: center; flex-wrap: wrap; font-size: 12px; }
+.back-to-top { cursor: pointer; pointer-events: none; }
+.back-to-top.is-visible { pointer-events: auto; }
+body.is-history .about-section { display: none; }
+.section-hero h1, .about-section h2 { letter-spacing: -.035em; }
+@media (max-width: 760px) {
+  .history-toolbar { align-items: stretch; }
+  .history-actions { justify-content: flex-start; }
+  .history-actions .button, .history-actions .import-label { flex: 1 1 auto; justify-content: center; white-space: nowrap; }
+  .analysis-panel { margin: 18px 0; }
+  .site-footer { align-items: flex-start; flex-direction: column; }
+  .footer-feedback { gap: 12px; }
+}

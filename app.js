@@ -130,6 +130,7 @@
     if (!dom.screens.some((screen) => screen.id === screenId)) return;
     state.activeScreen = screenId;
     document.body.classList.toggle("is-focusing", screenId === "timer-screen");
+    document.body.classList.toggle("is-history", screenId === "history-screen");
     dom.screens.forEach((screen) => screen.classList.toggle("is-active", screen.id === screenId));
     dom.navLinks.forEach((link) => {
       const active = link.dataset.screen === screenId;
@@ -438,8 +439,9 @@
       const ratio = item.elapsedSeconds ? Math.round(item.focusSeconds / item.elapsedSeconds * 100) : 0;
       const outcomeLabel = item.outcome === "completed" ? "Completed" : item.outcome === "failed" ? "Hardcore failed" : "Ended early";
       const cells = [
-        formatDate(item.completedAt), item.intent, item.topic || item.topics || "—", item.notes || item.studied || "—", formatClock(item.focusSeconds, item.focusSeconds >= 3600),
-        formatClock(item.elapsedSeconds, item.elapsedSeconds >= 3600), `${ratio}%`
+        formatDate(item.completedAt), item.intent || "Untitled session", item.topic || item.topics || "—", item.notes || item.studied || "—",
+        `${formatClock(item.focusSeconds, item.focusSeconds >= 3600)}${item.focusSeconds >= 3600 ? " h:m:s" : " m:s"}`,
+        `${formatClock(item.elapsedSeconds, item.elapsedSeconds >= 3600)}${item.elapsedSeconds >= 3600 ? " h:m:s" : " m:s"}`, `${ratio}%`
       ];
       cells.forEach((value) => {
         const td = document.createElement("td");
@@ -461,7 +463,8 @@
       dom.historyTableBody.append(tr);
     });
     const totalFocus = state.history.reduce((sum, item) => sum + item.focusSeconds, 0);
-    const avg = state.history.length ? Math.round(state.history.reduce((sum, item) => sum + (item.elapsedSeconds ? item.focusSeconds / item.elapsedSeconds * 100 : 0), 0) / state.history.length) : null;
+    const totalElapsed = state.history.reduce((sum, item) => sum + item.elapsedSeconds, 0);
+    const avg = totalElapsed > 0 ? Math.round(state.history.reduce((sum, item) => sum + item.focusSeconds, 0) / totalElapsed * 100) : null;
     dom.historySessionCount.textContent = String(state.history.length);
     dom.historyTotalFocus.textContent = formatDuration(totalFocus);
     dom.historyAverage.textContent = avg === null ? "—" : `${avg}%`;
@@ -484,7 +487,8 @@
     const focus = rows.reduce((sum, item) => sum + item.focusSeconds, 0);
     const breaks = rows.reduce((sum, item) => sum + item.breakSeconds, 0);
     const elapsed = rows.reduce((sum, item) => sum + item.elapsedSeconds, 0);
-    const avg = rows.length ? Math.round(rows.reduce((sum, item) => sum + (item.elapsedSeconds ? item.focusSeconds / item.elapsedSeconds * 100 : 0), 0) / rows.length) : 0;
+    const avgElapsed = rows.reduce((sum, item) => sum + item.elapsedSeconds, 0);
+    const avg = avgElapsed > 0 ? Math.round(focus / avgElapsed * 100) : 0;
     const stats = [["Matching sessions", rows.length], ["Total focus time", formatDuration(focus)], ["Total break time", formatDuration(breaks)], ["Total elapsed", formatDuration(elapsed)], ["Average time ratio", rows.length ? `${avg}%` : "—"]];
     dom.analysisStats.replaceChildren();
     stats.forEach(([label, value]) => { const card = document.createElement("div"); card.className = "analysis-stat"; const small = document.createElement("span"); small.textContent = label; const strong = document.createElement("strong"); strong.textContent = String(value); card.append(small, strong); dom.analysisStats.append(card); });
@@ -692,8 +696,16 @@
     dom.sessionTopic.addEventListener("input", () => { if (state.session) { state.session.topic = dom.sessionTopic.value; safeWrite(ACTIVE_SESSION_KEY, state.session); } });
     dom.sessionNotes.addEventListener("input", () => { if (state.session) { state.session.notes = dom.sessionNotes.value; safeWrite(ACTIVE_SESSION_KEY, state.session); } else if (state.lastReportId) { const r = state.history.find(x => x.id === state.lastReportId); if (r) { r.notes = r.studied = dom.sessionNotes.value; saveHistory(); } } });
     dom.sessionTopic.addEventListener("change", () => { if (!state.session && state.lastReportId) { const r = state.history.find(x => x.id === state.lastReportId); if (r) { r.topic = r.topics = dom.sessionTopic.value; saveHistory(); renderHistory(); } } });
+    const updateBackToTop = () => {
+      const visible = window.scrollY > 240;
+      dom.backToTop.classList.toggle("is-visible", visible);
+      dom.backToTop.setAttribute("aria-hidden", String(!visible));
+      dom.backToTop.tabIndex = visible ? 0 : -1;
+    };
     dom.backToTop.addEventListener("click", () => window.scrollTo({top:0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"}));
-    window.addEventListener("scroll", () => dom.backToTop.classList.toggle("is-visible", window.scrollY > 360), {passive:true});
+    window.addEventListener("scroll", updateBackToTop, {passive:true});
+    window.addEventListener("pageshow", updateBackToTop);
+    updateBackToTop();
     dom.confirmDialog.addEventListener("close", () => {
       const action = state.confirmAction;
       state.confirmAction = null;
