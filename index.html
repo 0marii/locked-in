@@ -2,16 +2,32 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101310">
   <meta name="description" content="Locked-In is a simple, customizable focus timer to plan deep-work sessions, track breaks, and review your focus habits.">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://0marii.github.io/locked-in/">
   <title>Locked-In — Focus Timer & Deep Work Tracker</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="manifest" href="./manifest.webmanifest">
   <meta name="author" content="Mohammad Al-Omari">
   <meta name="color-scheme" content="dark light">
   <link rel="stylesheet" href="./style.css?v=6">
+  
+  <!-- Prevent Theme FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem("locked_in_theme");
+        var system = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        var chosen = saved || system;
+        document.documentElement.dataset.theme = chosen;
+        var bg = chosen === "light" ? "#f5f5f0" : (chosen === "forest" ? "#0b1714" : (chosen === "pink" ? "#1b1018" : (chosen === "violet" ? "#15121e" : (chosen === "blue" ? "#0b1424" : "#101310"))));
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", bg);
+      } catch (e) {}
+    })();
+  </script>
+
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Locked-In">
   <meta property="og:title" content="Locked-In — Focus Timer & Deep Work Tracker">
@@ -22,19 +38,13 @@
   <meta name="twitter:image" content="https://0marii.github.io/locked-in/og-image.svg">
   <meta name="twitter:title" content="Locked-In — Focus Timer & Deep Work Tracker">
   <meta name="twitter:description" content="A customizable focus timer for deliberate deep work.">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Locked-In",
-    "url": "https://0marii.github.io/locked-in/",
-    "applicationCategory": "ProductivityApplication",
-    "operatingSystem": "Any",
-    "description": "A browser-based focus timer for planning deep-work sessions, tracking breaks, and reviewing focus habits.",
-    "browserRequirements": "Requires JavaScript and local storage."
-  }
+  
+  <script src="./app.js?v=7" defer></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+    }
   </script>
-  <script src="./app.js?v=6" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -50,21 +60,23 @@
     </button>
 
     <nav class="site-nav" id="site-nav" aria-label="Main navigation">
-      <button class="nav-link is-active" type="button" data-screen="setup-screen">Focus</button>
-      <button class="nav-link" type="button" data-screen="history-screen">Session history</button>
-      <button class="nav-link" id="sticky-notes-nav" type="button">Sticky notes</button>
-      <a class="nav-link" href="#about">About</a>
-      <label class="theme-control" for="theme-select">
-        <span>Theme</span>
-        <select id="theme-select" aria-label="Choose color theme">
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-          <option value="forest">Forest</option>
-          <option value="violet">Violet</option>
-          <option value="pink">Pink</option>
-          <option value="blue">Blue</option>
-        </select>
-      </label>
+      <button class="nav-link is-active" type="button" data-screen="setup-screen">Timer</button>
+      <button class="nav-link" type="button" data-screen="history-screen">History</button>
+      <button class="nav-link" type="button" data-screen="insights-screen">Insights</button>
+      <button class="nav-link" type="button" data-screen="notes-screen">Notes</button>
+      <div class="theme-picker">
+        <button class="theme-button" id="theme-button" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Theme picker">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-name">Dark</span><span aria-hidden="true">⌄</span>
+        </button>
+        <div class="theme-popover" id="theme-popover" role="radiogroup" aria-label="Color theme">
+          <button type="button" data-theme="dark" role="radio"><span class="swatch swatch-dark"></span>Dark</button>
+          <button type="button" data-theme="light" role="radio"><span class="swatch swatch-light"></span>Light</button>
+          <button type="button" data-theme="forest" role="radio"><span class="swatch swatch-forest"></span>Forest</button>
+          <button type="button" data-theme="violet" role="radio"><span class="swatch swatch-violet"></span>Violet</button>
+          <button type="button" data-theme="pink" role="radio"><span class="swatch swatch-pink"></span>Pink</button>
+          <button type="button" data-theme="blue" role="radio"><span class="swatch swatch-blue"></span>Blue</button>
+        </div>
+      </div>
     </nav>
   </header>
 
@@ -72,13 +84,13 @@
     <section id="setup-screen" class="screen is-active" aria-labelledby="page-title">
       <div class="hero">
         <p class="eyebrow"><span class="eyebrow-dot"></span> YOUR TIME. YOUR INTENTION.</p>
-        <h1 id="page-title">Make time for<br><span>what matters.</span></h1>
+        <h1 id="page-title">Make time for <span>what matters.</span></h1>
         <p class="hero-copy">Choose one thing. Give it your attention. Build a record of showing up.</p>
       </div>
 
       <div class="panel active-session-banner is-hidden" id="active-session-banner">
         <div><strong>Session still running</strong><p id="active-session-label">Your focus timer is active in the background.</p></div>
-        <button class="button button-primary" id="resume-session-btn" type="button">Return to timer ↗</button>
+        <button class="button button-primary" id="resume-session-btn" type="button">Return to timer →</button>
       </div>
       <div class="setup-layout">
         <form class="panel setup-panel" id="setup-form">
@@ -122,11 +134,12 @@
               <option value="standard">Standard · Take breaks when needed</option>
               <option value="hardcore">Hardcore · Total break time over 15 minutes fails the session</option>
             </select>
-            <p class="field-hint">Hardcore mode is optional. Your timer and history stay in this browser.</p>
+            <p class="field-hint">Hardcore is strict: 15:00 total break time fails the session. All data stays in this browser.</p>
+            <p class="rule-note"><strong>Completion rule:</strong> finish at least 70% of planned focus time for the attempt to count as completed.</p>
           </div>
 
           <button class="button button-primary button-full" type="submit">
-            <span>Start focusing</span><span aria-hidden="true">↗</span>
+            <span>Start focusing</span><span aria-hidden="true">→</span>
           </button>
           <p class="privacy-note"><span aria-hidden="true">●</span> Your sessions are stored locally on this device.</p>
         </form>
@@ -138,8 +151,9 @@
             <h2>One thing<br>at a time.</h2>
             <p>Don't optimize every minute. Pick a meaningful task, start the clock, and give yourself room to do the work.</p>
             <div class="note-divider"></div>
-            <div class="mini-stat"><span>Sessions completed</span><strong id="setup-session-count">0</strong></div>
-            <div class="mini-stat"><span>Total focus time</span><strong id="setup-total-focus">0m</strong></div>
+            <div class="mini-stat"><span>Completed sessions</span><strong id="setup-completed-count">0</strong></div>
+            <div class="mini-stat"><span>All attempts</span><strong id="setup-all-count">0</strong></div>
+            <div class="mini-stat"><span>Completed focus time</span><strong id="setup-total-focus">0s</strong></div>
           </div>
           <div class="tip-card">
             <span class="tip-icon" aria-hidden="true">↳</span>
@@ -186,11 +200,11 @@
       </div>
       <div class="panel report-panel">
         <div class="score-row">
-          <div><span class="metric-label">FOCUS SCORE</span><strong class="score-number" id="efficiency-percent">100%</strong></div>
-          <span class="score-caption" id="rank-display">Strong effort</span>
+          <div><span class="metric-label">COMPLETION SCORE</span><strong class="score-number" id="completion-percent">100%</strong></div>
+          <span class="score-caption" id="completion-caption">Strong completion</span>
         </div>
-        <div class="progress-track"><span id="efficiency-bar"></span></div>
-        <p class="metric-explanation">Score rewards completing at least 70% of planned focus time and subtracts penalties for breaks. It is a time-based estimate, not a measure of concentration quality.</p>
+        <div class="progress-track"><span id="completion-bar"></span></div>
+        <p class="metric-explanation">A time-based completion metric. It is not a measure of concentration quality. An attempt must reach 70% of planned focus time to count as completed.</p>
         <div class="metrics-grid">
           <div class="metric-box"><span class="metric-label">YOUR GOAL</span><strong id="rep-intent">—</strong></div>
           <div class="metric-box"><span class="metric-label">FOCUSED TIME</span><strong id="rep-focus">00:00</strong></div>
@@ -198,17 +212,16 @@
           <div class="metric-box"><span class="metric-label">BREAKS</span><strong id="rep-breaks">0 · 00:00</strong></div>
         </div>
         <section class="session-notes-card" aria-labelledby="session-notes-title">
-          <h2 id="session-notes-title">What did you work on?</h2>
-          <p>Capture topics, progress, and what you want to continue next time.</p>
-          <div class="field"><label for="session-topic">Topics / things worked on</label><input id="session-topic" maxlength="240" placeholder="e.g. Redis streams, consumers, TypeScript"><button class="button button-secondary editor-save" id="save-topic-btn" type="button" disabled>Save topic</button><span class="save-state" id="topic-save-state" aria-live="polite">No unsaved changes</span></div>
-          <div class="field"><label for="session-notes">Notes</label><textarea id="session-notes" rows="4" maxlength="4000" placeholder="What did you do, learn, or want to remember?"></textarea><button class="button button-secondary editor-save" id="save-notes-btn" type="button" disabled>Save notes</button><span class="save-state" id="notes-save-state" aria-live="polite">No unsaved changes</span></div>
-          <p class="field-hint" id="notes-save-status" aria-live="polite">Notes are saved with this session when you finish.</p>
+          <div class="notes-card-heading"><div><h2 id="session-notes-title">What did you work on?</h2><p>Save a topic and notes with this session.</p></div><span class="save-state" id="report-save-state" aria-live="polite">Saved</span></div>
+          <div class="field"><label for="report-topic">Topics / things worked on</label><input id="report-topic" maxlength="240" placeholder="e.g. Redis streams, TypeScript"></div>
+          <div class="field"><label for="report-notes">Notes</label><textarea id="report-notes" rows="5" maxlength="4000" placeholder="What did you do, learn, or want to remember?"></textarea></div>
+          <button class="button button-secondary" id="report-save-btn" type="button">Save notes</button>
         </section>
         <div class="break-breakdown-card is-hidden" id="break-breakdown-wrapper">
           <h2>Break log</h2><ul id="break-breakdown-list"></ul>
         </div>
         <div class="report-actions">
-          <button class="button button-primary" id="new-session-btn" type="button">Start another session ↗</button>
+          <button class="button button-primary" id="new-session-btn" type="button">Start another session →</button>
           <button class="button button-secondary" id="report-history-btn" type="button">View session history</button>
         </div>
       </div>
@@ -221,12 +234,15 @@
         <p>A private record of the time you've chosen to protect.</p>
       </div>
       <div class="history-summary">
-        <div class="panel summary-card"><span class="metric-label">SESSIONS</span><strong id="history-session-count">0</strong></div>
-        <div class="panel summary-card"><span class="metric-label">FOCUS TIME</span><strong id="history-total-focus">0m</strong></div>
-        <div class="panel summary-card"><span class="metric-label">AVG. FOCUS SCORE</span><strong id="history-average">—</strong></div>
+        <div class="panel summary-card"><span class="metric-label">COMPLETED</span><strong id="history-completed-count">0</strong><small>Reached 70%+ of plan</small></div>
+        <div class="panel summary-card"><span class="metric-label">ALL ATTEMPTS</span><strong id="history-attempt-count">0</strong><small>Completed + incomplete + failed</small></div>
+        <div class="panel summary-card"><span class="metric-label">COMPLETED FOCUS</span><strong id="history-total-focus">0s</strong><small>Only completed sessions</small></div>
       </div>
       <div class="history-toolbar">
         <label class="search-field" for="history-search"><span aria-hidden="true">⌕</span><input id="history-search" type="search" placeholder="Search goals, topics, or notes…" autocomplete="off"></label>
+        <label class="compact-field">From <input id="history-date-from" type="date"></label>
+        <label class="compact-field">To <input id="history-date-to" type="date"></label>
+        <label class="compact-field">Sort <select id="history-sort"><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="focus">Most focus</option></select></label>
         <div class="history-actions">
           <button class="button button-secondary button-small" id="export-csv-btn" type="button">Export CSV</button>
           <button class="button button-secondary button-small" id="export-json-btn" type="button">Backup JSON</button>
@@ -238,7 +254,7 @@
         <div class="table-scroll">
           <table class="history-table">
             <caption class="visually-hidden">Saved focus sessions, including goals, notes, time, and outcomes</caption>
-            <thead><tr><th scope="col">Date</th><th scope="col">Goal</th><th scope="col">Topics / work</th><th scope="col">Notes</th><th scope="col">Focus</th><th scope="col">Elapsed</th><th scope="col">Focus score</th><th scope="col">Outcome</th><th scope="col">Actions</th></tr></thead>
+            <thead><tr><th scope="col">Date</th><th scope="col">Goal</th><th scope="col">Topics / work</th><th scope="col">Notes</th><th scope="col">Focus</th><th scope="col">Elapsed</th><th scope="col">Completion score</th><th scope="col">Outcome</th><th scope="col">Actions</th></tr></thead>
             <tbody id="history-table-body"></tbody>
           </table>
         </div>
@@ -247,22 +263,40 @@
           <button class="button button-primary" id="history-start-btn" type="button">Start a session</button>
         </div>
       </div>
-      <section class="panel analysis-panel" aria-labelledby="analysis-title">
-        <div class="analysis-heading"><div><p class="eyebrow">SESSION INSIGHTS</p><h2 id="analysis-title">Your focus, over time</h2></div><p id="analysis-summary" class="local-data-note">Complete a session to see your focus history here.</p></div>
-        <div class="analysis-stats" id="analysis-stats" aria-live="polite"></div>
-        <canvas id="focus-chart" class="focus-chart" role="img" aria-label="Bar chart showing focus time for recent sessions"></canvas>
-        <p class="local-data-note">Chart shows up to the 12 most recent sessions matching your search. Values are time records, not a measure of concentration quality.</p>
-      </section>
-      <p class="local-data-note">Your history lives in this browser's local storage. Use Backup JSON to save a copy before clearing browser data.</p>
+
     </section>
 
-    <section id="about" class="about-section" aria-labelledby="about-title">
-      <div><p class="eyebrow">ABOUT LOCKED-IN</p><h2 id="about-title">A little more intention.<br>A little less noise.</h2></div>
-      <p>Locked-In is a lightweight, browser-based focus timer. It does not need an account or a server. Your sessions stay on your device, and you can export them whenever you want.</p>
-      <a href="https://github.com/0marii/locked-in" target="_blank" rel="noopener noreferrer">Explore the source on GitHub ↗</a>
+    <section id="insights-screen" class="screen" aria-labelledby="insights-title">
+      <div class="section-hero">
+        <p class="eyebrow">PRIVATE INSIGHTS</p>
+        <h1 id="insights-title">Your patterns.</h1>
+        <p id="insights-summary">Start a session to build your private insights.</p>
+      </div>
+      <div class="insights-stats" id="insights-stats"></div>
+      <div class="insights-grid">
+        <section class="panel insight-panel"><div class="panel-heading"><div><p class="eyebrow">LAST 7 DAYS</p><h2>Completed focus</h2></div></div><canvas id="weekly-chart" class="focus-chart" role="img" aria-label="Seven day completed focus chart"></canvas></section>
+        <section class="panel insight-panel"><div class="panel-heading"><div><p class="eyebrow">CONSISTENCY</p><h2>Focus days</h2></div><div class="streak-pair"><strong id="streak-current">0</strong><span>current streak</span><strong id="streak-best">0</strong><span>best streak</span></div></section>
+      </div>
+      <section class="panel insight-panel"><div class="panel-heading"><div><p class="eyebrow">12 WEEKS</p><h2>Focus heatmap</h2></div><p class="local-data-note">Completed focus time by day.</p></div><div id="heatmap" class="heatmap" aria-label="Focus activity heatmap"></div></section>
+      <div class="insights-grid">
+        <section class="panel insight-panel"><p class="eyebrow">BEST TIME</p><h2 id="best-time">—</h2><p class="local-data-note">The hour with the most completed focus time.</p></section>
+        <section class="panel insight-panel"><p class="eyebrow">TOP GOAL</p><h2 id="best-goal">—</h2><p class="local-data-note">The goal with the most completed focus time.</p></section>
+      </div>
     </section>
 
-    <footer class="site-footer">
+    <section id="notes-screen" class="screen" aria-labelledby="notes-title">
+      <div class="section-hero notes-hero-row">
+        <div><p class="eyebrow">YOUR NOTES</p><h1 id="notes-title">Thoughts worth keeping.</h1><p>Session notes live here, plus an inbox for quick thoughts when no session is active.</p></div>
+        <form id="note-capture-form" class="quick-capture panel"><label for="note-capture-input">Quick capture</label><textarea id="note-capture-input" maxlength="2000" rows="3" placeholder="Capture a thought…"></textarea><button class="button button-primary" type="submit">Add to inbox</button></form>
+      </div>
+      <label class="search-field notes-search" for="notes-search"><span aria-hidden="true">⌕</span><input id="notes-search" type="search" placeholder="Search notes and goals…" autocomplete="off"></label>
+      <div class="notes-columns">
+        <section class="panel notes-list"><div class="panel-heading"><div><p class="eyebrow">INBOX</p><h2>Quick thoughts</h2></div></div><div id="notes-inbox"></div></section>
+        <section class="panel notes-list"><div class="panel-heading"><div><p class="eyebrow">SESSIONS</p><h2>Session notes</h2></div></div><div id="notes-sessions"></div></section>
+      </div>
+    </section>
+
+    <footer class="site-footer" id="about"><span class="footer-about"><strong>Locked-In</strong> is a private, browser-only focus timer. No account. No server. Your data stays on this device.</span>
       <span>© <span id="current-year"></span> Locked-In</span>
       <span>Built for deliberate work.</span>
       <div class="footer-feedback" aria-label="Feedback and contact"><a href="https://github.com/0marii/locked-in/issues/new?labels=enhancement&" target="_blank" rel="noopener noreferrer">Request a feature ↗</a><a href="https://github.com/0marii/locked-in/issues/new?labels=bug&" target="_blank" rel="noopener noreferrer">Report a bug ↗</a></div>
@@ -297,6 +331,17 @@
         <button class="button button-danger" id="confirm-accept" value="confirm">End session</button>
       </div>
     </form>
+  </dialog>
+  <dialog class="confirm-dialog" id="short-dialog" aria-labelledby="short-title">
+    <div class="confirm-content">
+      <p class="eyebrow">SHORT SESSION</p>
+      <h2 id="short-title">Less than one minute.</h2>
+      <p>This attempt is probably accidental. Locked-In will not silently add it to history.</p>
+      <div class="dialog-actions">
+        <button class="button button-danger-outline" id="short-discard" type="button">Discard</button>
+        <button class="button button-secondary" id="short-save" type="button">Save as incomplete</button>
+      </div>
+    </div>
   </dialog>
 </body>
 </html>
