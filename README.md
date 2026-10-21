@@ -15,7 +15,7 @@ A customizable, browser-based focus timer and deep-work tracker. Built with vani
 - Session report with focused time, elapsed time, break time, and focus time ratio.
 - Searchable local session history.
 - CSV export and JSON backup.
-- Four themes: Dark, Light, Forest, and Violet.
+- Five themes: Dark, Light, Forest, Violet, and Pink.
 - Responsive layout with a mobile hamburger navigation menu.
 - Keyboard shortcuts: `B` toggles a break and `S` ends a session while the timer screen is active.
 - SEO metadata, canonical URL, Open Graph metadata, JSON-LD, `robots.txt`, and sitemap.
@@ -76,3 +76,31 @@ The page includes a descriptive title, meta description, canonical URL, Open Gra
 
 ## License
 MIT
+
+## Updated interface and quality checks
+
+This version includes a fifth **Pink** theme, a fixed back-to-top control that appears after scrolling, responsive theme-selector refinements, additional hover/focus feedback, and more deliberate reduced-motion handling. Existing local history storage keys and the static hosting approach are preserved.
+
+### Test and syntax checks
+
+Node.js 18 or newer is required for the built-in test runner. No dependency installation is needed for these checks:
+
+```bash
+npm run check:syntax
+npm test
+```
+
+The included smoke tests verify static asset paths, theme wiring, scroll-to-top wiring, reduced-motion support, and SEO/static-hosting essentials. They are not a substitute for browser-based end-to-end testing or a Lighthouse run.
+
+### Lighthouse verification
+
+Run Lighthouse against the deployed site in Chrome DevTools (or PageSpeed Insights) for Performance, Accessibility, Best Practices, and SEO. A score of 100 is a target, not a guarantee: browser conditions, hosting headers, and crawler behavior can affect results. Check both desktop and mobile, and test timer completion, break/resume, history search, CSV export, JSON backup/import, and all themes before publishing.
+
+### Change summary
+
+- Added the Pink theme while preserving Dark, Light, Forest, and Violet.
+- Added an accessible back-to-top button that appears after scrolling and honors reduced-motion preferences.
+- Improved responsive theme-control sizing and small-screen navigation menu scrolling.
+- Added restrained interaction feedback and stronger focus-visible styling.
+- Added a no-dependency Node smoke-test suite and npm scripts for syntax and static checks.
+- Preserved relative asset URLs for the `/locked-in/` GitHub Pages project path.

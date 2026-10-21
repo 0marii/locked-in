@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101310">
+  <meta name="theme-color" content="#101310" id="theme-color-meta">
+  <meta name="color-scheme" content="dark light">
   <meta name="description" content="Locked-In is a simple, customizable focus timer to plan deep-work sessions, track breaks, and review your focus habits.">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://0marii.github.io/locked-in/">
@@ -58,6 +59,7 @@
           <option value="light">Light</option>
           <option value="forest">Forest</option>
           <option value="violet">Violet</option>
+          <option value="pink">Pink</option>
         </select>
       </label>
     </nav>
@@ -244,6 +246,9 @@
     </footer>
   </main>
 
+  <button class="back-to-top" id="back-to-top" type="button" aria-label="Back to top" title="Back to top" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 14 6-6 6 6" /></svg>
+  </button>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog class="confirm-dialog" id="confirm-dialog" aria-labelledby="confirm-title">
     <form method="dialog" class="confirm-content">

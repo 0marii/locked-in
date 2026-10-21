@@ -141,7 +141,7 @@
   }
 
   function setTheme(theme, persist = true) {
-    const validThemes = ["dark", "light", "forest", "violet"];
+    const validThemes = ["dark", "light", "forest", "violet", "pink"];
     const chosen = validThemes.includes(theme) ? theme : "dark";
     document.documentElement.dataset.theme = chosen;
     dom.themeSelect.value = chosen;

@@ -1,1 +1,13 @@
-/* Optional extra styling is injected by locked-in-enhancements.js. This file is included for customization. */
+/* Supplemental enhancement stylesheet. Core styles remain in style.css for static hosting. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.li-extra-panel { contain: layout style; }
+.li-extra-canvas { height: auto; min-height: 160px; }
+
+@media (max-width: 480px) {
+  .li-extra-actions > * { max-width: 100%; }
+  .li-extra-actions .button { white-space: normal; }
+}

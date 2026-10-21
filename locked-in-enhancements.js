@@ -59,11 +59,11 @@
     if (!target || $("li-feedback")) return;
     const p = panel("li-feedback", "Help improve Locked-In");
     const hint = document.createElement("p"); hint.className = "li-extra-hint";
-    hint.textContent = "These open your email app. Update the recipient address in locked-in-enhancements.js if needed.";
+    hint.textContent = "Share feedback or report a reproducible issue through the project repository.";
     p.append(hint);
     const actions = document.createElement("div"); actions.className = "li-extra-actions";
-    actions.append(button("Request a feature", () => location.href = "mailto:feedback@example.com?subject=" + encodeURIComponent("Locked-In feature request") + "&body=" + encodeURIComponent("Feature idea:\n\nWhy it would help:\n")));
-    actions.append(button("Report a bug", () => location.href = "mailto:feedback@example.com?subject=" + encodeURIComponent("Locked-In bug report") + "&body=" + encodeURIComponent("What happened:\nSteps to reproduce:\nBrowser/device:\n")));
+    actions.append(button("Request a feature", () => location.href = "https://github.com/0marii/locked-in/issues/new?title=" + encodeURIComponent("Feature request") + "&body=" + encodeURIComponent("## Feature idea\n\n## Why it would help\n")));
+    actions.append(button("Report a bug", () => location.href = "https://github.com/0marii/locked-in/issues/new?title=" + encodeURIComponent("Bug report") + "&body=" + encodeURIComponent("## What happened?\n\n## Steps to reproduce\n1. \n\n## Browser/device\n")));
     p.append(actions); target.append(p);
   }
 
@@ -205,8 +205,30 @@
     });
   }
 
+  function setupBackToTop() {
+    const button = $("back-to-top");
+    if (!button || button.dataset.liBound === "true") return;
+    button.dataset.liBound = "true";
+    let ticking = false;
+    const update = () => {
+      const visible = window.scrollY > 420;
+      if (visible) button.hidden = false;
+      button.classList.toggle("is-visible", visible);
+      if (!visible) window.setTimeout(() => { if (window.scrollY <= 420) button.hidden = true; }, 220);
+      ticking = false;
+    };
+    window.addEventListener("scroll", () => {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(update);
+      }
+    }, { passive: true });
+    button.addEventListener("click", () => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
+    update();
+  }
+
   function init() {
-    addStyles(); setupLogoHome(); injectExpectedEnd(); injectHistoryTools(); injectFeedback(); addSessionNotesEditor();
+    addStyles(); setupLogoHome(); setupBackToTop(); injectExpectedEnd(); injectHistoryTools(); injectFeedback(); addSessionNotesEditor();
     // Existing app writes the authoritative history key; observe it without replacing its storage behavior.
     const originalSetItem = Storage.prototype.setItem;
     if (!Storage.prototype.__liEnhanced) {

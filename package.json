@@ -1,0 +1,15 @@
+{
+  "name": "locked-in",
+  "version": "1.1.0",
+  "private": true,
+  "description": "A static, privacy-first focus timer and deep-work tracker.",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "check:syntax": "node --check app.js && node --check locked-in-enhancements.js",
+    "check": "npm run check:syntax && npm test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

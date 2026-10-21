@@ -247,3 +247,82 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; col
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Quality-of-life polish: theme controls, motion, responsive surfaces and scroll navigation. */
+:root[data-theme="pink"] {
+  color-scheme: dark;
+  --bg: #190f16;
+  --surface: #24151f;
+  --surface-raised: #301b29;
+  --surface-soft: #3a2232;
+  --text: #fff1f7;
+  --text-muted: #d0a8bb;
+  --text-subtle: #a77f93;
+  --border: #523246;
+  --accent: #ff8fc7;
+  --accent-strong: #ff6bb5;
+  --accent-ink: #351126;
+  --danger: #ff9a9a;
+  --danger-bg: rgba(255, 105, 130, .13);
+  --warning: #f7d58a;
+  --shadow: 0 24px 80px rgba(0, 0, 0, .3);
+}
+
+/* Give controls a consistent hit area and make the theme selector legible at every width. */
+.theme-control { min-height: 42px; }
+.theme-control select { width: 126px; max-width: 100%; min-height: 40px; padding-right: 30px; }
+.button, .nav-link, .menu-toggle, .text-button { -webkit-tap-highlight-color: transparent; }
+.button { transition: transform .18s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.button:hover { transform: translateY(-1px); }
+.button:active { transform: translateY(0) scale(.985); }
+.panel, .metric-box, .summary-card, .li-extra-panel, .tip-card { transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
+.panel:hover, .summary-card:hover { border-color: color-mix(in srgb, var(--accent) 32%, var(--border)); }
+.field input, .field select, .search-field, .li-extra-panel input, .li-extra-panel textarea { transition: border-color .18s ease, box-shadow .18s ease, background-color .2s ease; }
+.field input:focus-visible, .field select:focus-visible, .li-extra-panel input:focus-visible, .li-extra-panel textarea:focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent); }
+
+.back-to-top {
+  position: fixed;
+  z-index: 30;
+  right: clamp(16px, 3vw, 30px);
+  bottom: max(18px, env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 15px;
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0,0,0,.22);
+  opacity: 0;
+  transform: translateY(10px) scale(.96);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease, background-color .2s ease, border-color .2s ease;
+  cursor: pointer;
+}
+.back-to-top[hidden] { display: none; }
+.back-to-top.is-visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.back-to-top:hover { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.back-to-top svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Avoid expensive decorative movement and preserve readable layouts on narrow screens. */
+@media (min-width: 761px) {
+  .site-header { gap: clamp(16px, 3vw, 36px); }
+  .site-nav { flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (max-width: 760px) {
+  .site-header { gap: 12px; }
+  .site-nav { max-height: calc(100dvh - 72px); overflow-y: auto; }
+  .theme-control { width: 100%; gap: 14px; }
+  .theme-control select { width: min(180px, 58%); }
+  .back-to-top { width: 44px; height: 44px; border-radius: 13px; }
+  .history-actions { gap: 8px; }
+  .history-actions .button { min-height: 42px; }
+}
+@media (hover: none) {
+  .button:hover, .panel:hover, .summary-card:hover { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .button, .panel, .metric-box, .summary-card, .li-extra-panel, .tip-card, .back-to-top { transition: none !important; }
+  .button:hover, .button:active { transform: none; }
+}
