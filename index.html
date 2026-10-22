@@ -10,9 +10,10 @@
   <title>Locked-In — Focus Timer & Deep Work Tracker</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-192.png">
   <meta name="author" content="Mohammad Al-Omari">
   <meta name="color-scheme" content="dark light">
-  <link rel="stylesheet" href="./style.css?v=6">
+  <link rel="stylesheet" href="./style.css?v=17">
   
   <!-- Prevent Theme FOUC -->
   <script>
@@ -33,16 +34,34 @@
   <meta property="og:title" content="Locked-In — Focus Timer & Deep Work Tracker">
   <meta property="og:description" content="Choose a goal, focus on one thing, track breaks, and review your sessions.">
   <meta property="og:url" content="https://0marii.github.io/locked-in/">
-  <meta property="og:image" content="https://0marii.github.io/locked-in/og-image.svg">
+  <meta property="og:image" content="https://0marii.github.io/locked-in/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Locked-In focus timer">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://0marii.github.io/locked-in/og-image.svg">
+  <meta name="twitter:image" content="https://0marii.github.io/locked-in/og-image.png">
+  <meta name="twitter:image:alt" content="Locked-In focus timer">
   <meta name="twitter:title" content="Locked-In — Focus Timer & Deep Work Tracker">
   <meta name="twitter:description" content="A customizable focus timer for deliberate deep work.">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Locked-In",
+    "url": "https://0marii.github.io/locked-in/",
+    "description": "A private, browser-only focus timer for deliberate deep work.",
+    "applicationCategory": "ProductivityApplication",
+    "operatingSystem": "Any",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
   
-  <script src="./app.js?v=7" defer></script>
+  <script src="./app.js?v=14" defer></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("Locked-In SW registration failed.", err));
+      });
     }
   </script>
 </head>
@@ -80,6 +99,15 @@
     </nav>
   </header>
 
+  <div class="floating-timer is-hidden" id="floating-timer" role="status" aria-live="off" hidden>
+    <div class="floating-timer-info">
+      <span class="floating-timer-badge" id="floating-timer-badge"><span class="status-dot" aria-hidden="true"></span><span id="floating-timer-status">Focusing</span></span>
+      <strong class="floating-timer-intent" id="floating-timer-intent">Session running</strong>
+      <span class="floating-timer-clock" id="floating-timer-clock">00:00</span>
+    </div>
+    <button class="button button-primary button-small" id="floating-timer-return" type="button">Return to timer</button>
+  </div>
+
   <main id="main-content" class="page-shell">
     <section id="setup-screen" class="screen is-active" aria-labelledby="page-title">
       <div class="hero">
@@ -103,6 +131,19 @@
             <label for="task-intent">Your focus goal</label>
             <input id="task-intent" name="intent" type="text" maxlength="120" placeholder="e.g. Coding, writing, studying…" autocomplete="off" required>
             <p class="field-hint">Anything you want: coding, reading, a side project, or your own custom goal.</p>
+            <div class="recent-goals is-hidden" id="recent-goals" aria-label="Recent goals"></div>
+          </div>
+
+          <div class="field">
+            <label for="goal-tag">Tag <span class="optional-label">(optional)</span></label>
+            <select id="goal-tag" name="goalTag">
+              <option value="">No tag</option>
+              <option value="Study">Study</option>
+              <option value="Code">Code</option>
+              <option value="Writing">Writing</option>
+              <option value="Other">Other</option>
+            </select>
+            <input id="goal-tag-custom" class="is-hidden" type="text" maxlength="24" placeholder="Custom tag…" aria-label="Custom tag" aria-hidden="true">
           </div>
 
           <div class="field">
@@ -132,9 +173,9 @@
             <label for="session-style">Session style</label>
             <select id="session-style" name="sessionStyle">
               <option value="standard">Standard · Take breaks when needed</option>
-              <option value="hardcore">Hardcore · Total break time over 15 minutes fails the session</option>
+              <option value="hardcore">Hardcore · Reaching 15:00 total break time fails the session</option>
             </select>
-            <p class="field-hint">Hardcore is strict: 15:00 total break time fails the session. All data stays in this browser.</p>
+            <p class="field-hint">Hardcore is strict: 15:00 or more total break time fails the session. All data stays in this browser.</p>
             <p class="rule-note"><strong>Completion rule:</strong> finish at least 70% of planned focus time for the attempt to count as completed.</p>
           </div>
 
@@ -142,9 +183,33 @@
             <span>Start focusing</span><span aria-hidden="true">→</span>
           </button>
           <p class="privacy-note"><span aria-hidden="true">●</span> Your sessions are stored locally on this device.</p>
+
+          <div class="prefs-panel" id="prefs-panel">
+            <p class="eyebrow">PREFERENCES</p>
+            <label class="prefs-row"><input id="pref-notify-end" type="checkbox"> Enable end notifications</label>
+            <label class="prefs-row"><input id="pref-notify-break" type="checkbox"> Remind me after 5 min on break</label>
+            <label class="prefs-row"><input id="pref-pomodoro" type="checkbox"> Suggest a break every 25 min of focus</label>
+            <div class="field prefs-field">
+              <label for="pref-chime">Completion chime</label>
+              <select id="pref-chime">
+                <option value="off">Off</option>
+                <option value="soft" selected>Soft</option>
+                <option value="full">Full</option>
+              </select>
+            </div>
+          </div>
         </form>
 
         <aside class="side-column">
+          <div class="panel focus-goal-card" id="setup-focus-goal-card">
+            <p class="eyebrow">TODAY’S FOCUS</p>
+            <div class="goal-progress-row">
+              <strong id="setup-daily-progress-label">0m / 2h</strong>
+              <button class="text-button" id="setup-edit-goals-btn" type="button">Edit goals</button>
+            </div>
+            <div class="goal-progress-track" aria-hidden="true"><span id="setup-daily-progress-bar"></span></div>
+            <p class="field-hint" id="setup-weekly-progress-hint">This week: 0m / 10h</p>
+          </div>
           <div class="panel note-panel">
             <p class="eyebrow">THE RULE IS SIMPLE</p>
             <div class="note-symbol" aria-hidden="true">✳</div>
@@ -180,7 +245,11 @@
           <div><span>PLANNED</span><strong id="planned-time">45 min</strong></div>
           <div><span>BREAK TIME</span><strong id="break-time">00:00</strong></div>
           <div><span>ELAPSED</span><strong id="elapsed-time">00:00</strong></div>
-          <div><span>EXPECTED END</span><strong id="expected-end-time">—</strong></div>
+          <div class="expected-end-meta">
+            <span>EXPECTED END</span>
+            <strong id="expected-end-time" title="Real end time including breaks taken so far.">—</strong>
+            <small id="expected-end-scheduled" title="Original end time if you take no breaks.">Scheduled —</small>
+          </div>
         </div>
         <p class="timer-status-message" id="timer-status-message">You're in control. Stay present.</p>
         <div class="timer-actions">
@@ -189,6 +258,27 @@
         </div>
         <label class="keyboard-hint shortcut-toggle"><input id="keyboard-shortcuts" type="checkbox" checked> Enable keyboard shortcuts: <kbd>B</kbd> break · <kbd>S</kbd> end session</label>
       </div>
+
+      <aside class="sticky-notes" id="sticky-notes" aria-label="Session sticky notes" hidden>
+        <div class="sticky-notes-head">
+          <div>
+            <p class="eyebrow">STICKY NOTES</p>
+            <h2 id="sticky-notes-title">Session notes</h2>
+          </div>
+          <button class="sticky-notes-close" id="sticky-notes-close" type="button" aria-label="Close sticky notes">×</button>
+        </div>
+        <p class="sticky-notes-hint">Add as many notes as you need. Each one is kept separately.</p>
+        <ul class="sticky-notes-list" id="sticky-notes-list" aria-label="Saved session notes"></ul>
+        <label class="visually-hidden" for="sticky-notes-input">New session note</label>
+        <textarea id="sticky-notes-input" maxlength="2000" rows="4" placeholder="Write a new note…"></textarea>
+        <div class="sticky-notes-foot">
+          <span class="sticky-notes-state" id="sticky-notes-state" aria-live="polite">Ready</span>
+          <button class="button button-primary button-small" id="sticky-notes-save" type="button">Add note</button>
+        </div>
+      </aside>
+      <button class="sticky-notes-toggle" id="sticky-notes-toggle" type="button" aria-controls="sticky-notes" aria-expanded="false" hidden>
+        <span aria-hidden="true">✎</span> Notes
+      </button>
     </section>
 
     <section id="report-screen" class="screen" aria-labelledby="report-title">
@@ -240,9 +330,30 @@
       </div>
       <div class="history-toolbar">
         <label class="search-field" for="history-search"><span aria-hidden="true">⌕</span><input id="history-search" type="search" placeholder="Search goals, topics, or notes…" autocomplete="off"></label>
-        <label class="compact-field">From <input id="history-date-from" type="date"></label>
-        <label class="compact-field">To <input id="history-date-to" type="date"></label>
-        <label class="compact-field">Sort <select id="history-sort"><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="focus">Most focus</option></select></label>
+        <div class="history-filters" role="group" aria-label="Filter and sort history">
+          <label class="compact-field" for="history-date-from">
+            <span>From</span>
+            <input id="history-date-from" type="date">
+          </label>
+          <label class="compact-field" for="history-date-to">
+            <span>To</span>
+            <input id="history-date-to" type="date">
+          </label>
+          <label class="compact-field compact-field-select" for="history-sort">
+            <span>Sort</span>
+            <select id="history-sort">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="focus">Most focus</option>
+            </select>
+          </label>
+          <label class="compact-field compact-field-select" for="history-tag-filter">
+            <span>Tag</span>
+            <select id="history-tag-filter">
+              <option value="">All tags</option>
+            </select>
+          </label>
+        </div>
         <div class="history-actions">
           <button class="button button-secondary button-small" id="export-csv-btn" type="button">Export CSV</button>
           <button class="button button-secondary button-small" id="export-json-btn" type="button">Backup JSON</button>
@@ -254,7 +365,18 @@
         <div class="table-scroll">
           <table class="history-table">
             <caption class="visually-hidden">Saved focus sessions, including goals, notes, time, and outcomes</caption>
-            <thead><tr><th scope="col">Date</th><th scope="col">Goal</th><th scope="col">Topics / work</th><th scope="col">Notes</th><th scope="col">Focus</th><th scope="col">Elapsed</th><th scope="col">Completion score</th><th scope="col">Outcome</th><th scope="col">Actions</th></tr></thead>
+            <thead><tr>
+              <th scope="col" title="When this session was saved.">Date</th>
+              <th scope="col" title="The focus goal you set when starting the session.">Goal</th>
+              <th scope="col" title="Optional session tag (Study, Code, Writing, or custom).">Tag</th>
+              <th scope="col" title="Optional topics or work areas you tagged for this session.">Topics / work</th>
+              <th scope="col" title="Notes captured during or after the session.">Notes</th>
+              <th scope="col" title="Active focus time only — pauses/breaks are not included.">Focus</th>
+              <th scope="col" title="Total clock time from start to finish, including breaks.">Elapsed</th>
+              <th scope="col" title="Time-based completion score from focused / planned time, minus break penalties. Requires at least 70% of the plan. Not a measure of concentration quality.">Completion score</th>
+              <th scope="col" title="Final session result: Completed, Incomplete, Ended early, or Hardcore failed.">Outcome</th>
+              <th scope="col" title="Edit topics/notes or delete this session from local history.">Actions</th>
+            </tr></thead>
             <tbody id="history-table-body"></tbody>
           </table>
         </div>
@@ -273,14 +395,95 @@
         <p id="insights-summary">Start a session to build your private insights.</p>
       </div>
       <div class="insights-stats" id="insights-stats"></div>
-      <div class="insights-grid">
-        <section class="panel insight-panel"><div class="panel-heading"><div><p class="eyebrow">LAST 7 DAYS</p><h2>Completed focus</h2></div></div><canvas id="weekly-chart" class="focus-chart" role="img" aria-label="Seven day completed focus chart"></canvas></section>
-        <section class="panel insight-panel"><div class="panel-heading"><div><p class="eyebrow">CONSISTENCY</p><h2>Focus days</h2></div><div class="streak-pair"><strong id="streak-current">0</strong><span>current streak</span><strong id="streak-best">0</strong><span>best streak</span></div></section>
+      <section class="panel insight-panel focus-goals-panel" id="focus-goals-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">FOCUS GOALS</p><h2>Daily & weekly targets</h2></div>
+          <button class="button button-secondary button-small" id="share-week-card-btn" type="button">Save week card</button>
+        </div>
+        <div class="focus-goals-grid">
+          <div class="focus-goal-block" data-goal="daily">
+            <div class="goal-editor-head">
+              <label for="goal-daily-slider">Daily goal</label>
+              <strong id="goal-daily-display" aria-live="polite">2h 00m</strong>
+            </div>
+            <input id="goal-daily-slider" class="goal-slider" type="range" min="15" max="720" step="15" value="120" aria-valuetext="2 hours">
+            <div class="goal-hm-fields">
+              <label class="goal-hm-field" for="goal-daily-hours">
+                <span>Hours</span>
+                <input id="goal-daily-hours" type="number" inputmode="numeric" min="0" max="23" step="1" value="2">
+              </label>
+              <label class="goal-hm-field" for="goal-daily-mins">
+                <span>Minutes</span>
+                <input id="goal-daily-mins" type="number" inputmode="numeric" min="0" max="59" step="5" value="0">
+              </label>
+            </div>
+            <p class="local-data-note" id="insights-daily-progress-label">0m / 2h today</p>
+            <div class="goal-progress-track" aria-hidden="true"><span id="insights-daily-progress-bar"></span></div>
+          </div>
+          <div class="focus-goal-block" data-goal="weekly">
+            <div class="goal-editor-head">
+              <label for="goal-weekly-slider">Weekly goal</label>
+              <strong id="goal-weekly-display" aria-live="polite">10h 00m</strong>
+            </div>
+            <input id="goal-weekly-slider" class="goal-slider" type="range" min="30" max="2520" step="30" value="600" aria-valuetext="10 hours">
+            <div class="goal-hm-fields">
+              <label class="goal-hm-field" for="goal-weekly-hours">
+                <span>Hours</span>
+                <input id="goal-weekly-hours" type="number" inputmode="numeric" min="0" max="168" step="1" value="10">
+              </label>
+              <label class="goal-hm-field" for="goal-weekly-mins">
+                <span>Minutes</span>
+                <input id="goal-weekly-mins" type="number" inputmode="numeric" min="0" max="59" step="5" value="0">
+              </label>
+            </div>
+            <p class="local-data-note" id="insights-weekly-progress-label">0m / 10h this week</p>
+            <div class="goal-progress-track" aria-hidden="true"><span id="insights-weekly-progress-bar"></span></div>
+          </div>
+        </div>
+        <button class="button button-secondary button-small" id="save-focus-goals-btn" type="button">Save goals</button>
+      </section>
+      <div class="insights-grid insights-grid-chart">
+        <section class="panel insight-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">LAST 7 DAYS</p><h2>Completed focus</h2></div>
+          </div>
+          <canvas id="weekly-chart" class="focus-chart" role="img" aria-label="Seven day completed focus chart"></canvas>
+        </section>
+        <section class="panel insight-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">CONSISTENCY</p><h2>Focus days</h2></div>
+          </div>
+          <div class="streak-pair">
+            <strong id="streak-current">0</strong><span>current streak</span>
+            <strong id="streak-best">0</strong><span>best streak</span>
+          </div>
+        </section>
       </div>
-      <section class="panel insight-panel"><div class="panel-heading"><div><p class="eyebrow">12 WEEKS</p><h2>Focus heatmap</h2></div><p class="local-data-note">Completed focus time by day.</p></div><div id="heatmap" class="heatmap" aria-label="Focus activity heatmap"></div></section>
-      <div class="insights-grid">
+      <section class="panel insight-panel insights-heatmap-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">12 WEEKS</p><h2>Focus heatmap</h2></div>
+          <p class="local-data-note">Completed focus time by day.</p>
+        </div>
+        <div class="heatmap-body">
+          <div id="heatmap" class="heatmap" aria-hidden="true"></div>
+          <div class="heatmap-legend" aria-hidden="true">
+            <span>Less</span>
+            <div class="heatmap-legend-cells">
+              <span class="heat-cell" data-level="0"></span>
+              <span class="heat-cell" data-level="1"></span>
+              <span class="heat-cell" data-level="2"></span>
+              <span class="heat-cell" data-level="3"></span>
+              <span class="heat-cell" data-level="4"></span>
+            </div>
+            <span>More</span>
+          </div>
+        </div>
+        <ul id="heatmap-text" class="visually-hidden"></ul>
+      </section>
+      <div class="insights-grid insights-grid-meta">
         <section class="panel insight-panel"><p class="eyebrow">BEST TIME</p><h2 id="best-time">—</h2><p class="local-data-note">The hour with the most completed focus time.</p></section>
         <section class="panel insight-panel"><p class="eyebrow">TOP GOAL</p><h2 id="best-goal">—</h2><p class="local-data-note">The goal with the most completed focus time.</p></section>
+        <section class="panel insight-panel"><p class="eyebrow">TOP TAG</p><h2 id="best-tag">—</h2><p class="local-data-note">The tag with the most completed focus time.</p></section>
       </div>
     </section>
 
@@ -296,11 +499,29 @@
       </div>
     </section>
 
-    <footer class="site-footer" id="about"><span class="footer-about"><strong>Locked-In</strong> is a private, browser-only focus timer. No account. No server. Your data stays on this device.</span>
-      <span>© <span id="current-year"></span> Locked-In</span>
-      <span>Built for deliberate work.</span>
-      <div class="footer-feedback" aria-label="Feedback and contact"><a href="https://github.com/0marii/locked-in/issues/new?labels=enhancement&" target="_blank" rel="noopener noreferrer">Request a feature ↗</a><a href="https://github.com/0marii/locked-in/issues/new?labels=bug&" target="_blank" rel="noopener noreferrer">Report a bug ↗</a></div>
-      <div class="creator-credit">Made by <a href="https://github.com/0marii" target="_blank" rel="noopener noreferrer">Mohammad Al-Omari</a><div class="social-links" aria-label="Social links"><a class="social" href="https://jo.linkedin.com/in/alomari-se" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M5.2 3.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM3.4 9.4H7v11.2H3.4zM9.2 9.4h3.4v1.5h.1a3.7 3.7 0 0 1 3.3-1.8c3.5 0 4.2 2.2 4.2 5.1v6.4h-3.6v-5.7c0-1.4 0-3.1-1.9-3.1s-2.1 1.5-2.1 3v5.8H9.2z"/></svg></a><a class="social" href="https://github.com/0marii" aria-label="GitHub" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.5-1.3-1.3-1.6-1.3-1.6-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.3.8 1 .8 2v3c0 .4.2.7.8.6A11.1 11.1 0 0 0 12 .9Z"/></svg></a><a class="social" href="https://omari.vercel.app/" aria-label="Portfolio" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 4.2L18.1 18H5.9L12 6.2Z"/></svg></a><a class="social" href="mailto:mo.omari862@gmail.com" aria-label="Email"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M2 5h20v14H2V5Zm2 2v.5l8 5.3 8-5.3V7l-8 5.2L4 7Z"/></svg></a></div></div>
+    <footer class="site-footer" id="about">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <p class="footer-about"><strong>Locked-In</strong> is a private, browser-only focus timer. No account. No server. Your data stays on this device.</p>
+          <p class="footer-tagline">Built for deliberate work.</p>
+        </div>
+        <nav class="footer-feedback" aria-label="Feedback and contact">
+          <a href="https://github.com/0marii/locked-in/issues/new?labels=enhancement&" target="_blank" rel="noopener noreferrer">Request a feature <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/0marii/locked-in/issues/new?labels=bug&" target="_blank" rel="noopener noreferrer">Report a bug <span aria-hidden="true">↗</span></a>
+        </nav>
+      </div>
+      <div class="footer-meta">
+        <p class="footer-copy">© <span id="current-year"></span> Locked-In</p>
+        <div class="creator-credit">
+          <span>Made by <a href="https://github.com/0marii" target="_blank" rel="noopener noreferrer">Mohammad Al-Omari</a></span>
+          <div class="social-links" aria-label="Social links">
+            <a class="social" href="https://jo.linkedin.com/in/alomari-se" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5.2 3.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM3.4 9.4H7v11.2H3.4zM9.2 9.4h3.4v1.5h.1a3.7 3.7 0 0 1 3.3-1.8c3.5 0 4.2 2.2 4.2 5.1v6.4h-3.6v-5.7c0-1.4 0-3.1-1.9-3.1s-2.1 1.5-2.1 3v5.8H9.2z"/></svg></a>
+            <a class="social" href="https://github.com/0marii" aria-label="GitHub" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.5-1.3-1.3-1.6-1.3-1.6-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.3.8 1 .8 2v3c0 .4.2.7.8.6A11.1 11.1 0 0 0 12 .9Z"/></svg></a>
+            <a class="social" href="https://omari.vercel.app/" aria-label="Portfolio" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 4.2L18.1 18H5.9L12 6.2Z"/></svg></a>
+            <a class="social" href="mailto:mo.omari862@gmail.com" aria-label="Email"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M2 5h20v14H2V5Zm2 2v.5l8 5.3 8-5.3V7l-8 5.2L4 7Z"/></svg></a>
+          </div>
+        </div>
+      </div>
     </footer>
   </main>
 
@@ -308,17 +529,52 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog class="edit-session-dialog" id="edit-session-dialog" aria-labelledby="edit-session-heading">
     <form id="edit-session-form" class="edit-session-content">
-      <p class="eyebrow">SESSION NOTES</p>
+      <p class="eyebrow">SESSION</p>
       <h2 id="edit-session-heading">Edit your session</h2>
       <label for="edit-session-title">Topics / things worked on</label>
       <input id="edit-session-title" class="edit-session-title" maxlength="240" placeholder="e.g. Redis streams, TypeScript">
-      <label for="edit-session-notes">Notes</label>
-      <textarea id="edit-session-notes" class="edit-session-notes" rows="4" maxlength="4000" placeholder="What did you work on or learn?"></textarea>
+      <div class="edit-session-notes-summary">
+        <p class="local-data-note" id="edit-session-notes-summary">No notes yet.</p>
+        <button class="button button-secondary button-small" id="edit-session-open-notes" type="button">View &amp; edit notes</button>
+      </div>
       <div class="dialog-actions">
         <button class="button button-danger" id="edit-session-delete" type="button">Delete session</button>
         <span class="dialog-action-spacer"></span>
         <button class="button button-secondary" type="button" id="edit-session-cancel">Cancel</button>
         <button class="button button-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog class="edit-session-dialog view-notes-dialog" id="view-session-notes-dialog" aria-labelledby="view-session-notes-heading">
+    <div class="edit-session-content view-notes-content">
+      <p class="eyebrow">SESSION NOTES</p>
+      <h2 id="view-session-notes-heading">Notes</h2>
+      <p class="edit-note-context" id="view-session-notes-meta"></p>
+      <div id="view-session-notes-list" class="view-session-notes-list"></div>
+      <div class="field view-notes-add">
+        <label for="view-session-note-input">Add a note</label>
+        <textarea id="view-session-note-input" class="edit-session-notes" rows="3" maxlength="2000" placeholder="Capture another thought for this session…"></textarea>
+        <button class="button button-secondary button-small" id="view-session-note-add" type="button">Add note</button>
+      </div>
+      <div class="dialog-actions">
+        <button class="button button-secondary" id="view-session-notes-open-tab" type="button">Open in Notes tab</button>
+        <span class="dialog-action-spacer"></span>
+        <button class="button button-primary" id="view-session-notes-close" type="button">Close</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog class="edit-session-dialog" id="edit-note-dialog" aria-labelledby="edit-note-heading">
+    <form id="edit-note-form" class="edit-session-content">
+      <p class="eyebrow">NOTE</p>
+      <h2 id="edit-note-heading">Edit note</h2>
+      <p class="edit-note-context" id="edit-note-context"></p>
+      <label for="edit-note-text">Note text</label>
+      <textarea id="edit-note-text" class="edit-session-notes" rows="5" maxlength="2000" placeholder="Update this note…" required></textarea>
+      <div class="dialog-actions">
+        <button class="button button-danger" id="edit-note-delete" type="button">Delete note</button>
+        <span class="dialog-action-spacer"></span>
+        <button class="button button-secondary" type="button" id="edit-note-cancel">Cancel</button>
+        <button class="button button-primary" type="submit">Save note</button>
       </div>
     </form>
   </dialog>
