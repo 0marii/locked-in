@@ -26,7 +26,7 @@
         var system = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
         var chosen = saved || system;
         document.documentElement.dataset.theme = chosen;
-        var bg = chosen === "light" ? "#f5f5f0" : (chosen === "forest" ? "#0b1714" : (chosen === "pink" ? "#1b1018" : (chosen === "violet" ? "#15121e" : (chosen === "blue" ? "#0b1424" : "#101310"))));
+        var bg = chosen === "light" ? "#f5f5f0" : (chosen === "forest" ? "#0b1714" : (chosen === "pink" ? "#ebebeb" : (chosen === "violet" ? "#15121e" : (chosen === "blue" ? "#0b1424" : "#101310"))));
         document.querySelector('meta[name="theme-color"]').setAttribute("content", bg);
       } catch (e) {}
     })();
