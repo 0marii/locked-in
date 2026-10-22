@@ -1,0 +1,64 @@
+:root {
+  color-scheme: dark;
+  --bg: #101310;
+  --surface: #171b17;
+  --surface-raised: #1d231d;
+  --surface-soft: #222a22;
+  --text: #f2f4ed;
+  --text-muted: #a0aa9e;
+  --text-subtle: #8b9488;
+  --border: #303a30;
+  --accent: #b7f36b;
+  --accent-strong: #9bd94f;
+  --accent-ink: #16200d;
+  --danger: #ff8d83;
+  --danger-bg: rgba(255, 91, 79, .12);
+  --warning: #f2c66d;
+  --shadow: 0 24px 80px rgba(0,0,0,.22);
+  --radius: 18px;
+  --font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f5f0; --surface: #ffffff; --surface-raised: #f0f2eb; --surface-soft: #e8ece2;
+  --text: #20251d; --text-muted: #5f685a; --text-subtle: #626b5d; --border: #d9dfd3;
+  --accent: #35570f; --accent-strong: #2c4a0c; --accent-ink: #fff; --danger: #b83b32;
+  --danger-bg: rgba(184,59,50,.1); --warning: #8a5b00; --shadow: 0 24px 80px rgba(40,50,30,.08);
+}
+
+:root[data-theme="forest"] {
+  --bg: #0b1714; --surface: #11231d; --surface-raised: #173128; --surface-soft: #1e3a2e;
+  --text: #edf8ef; --text-muted: #a1c2ae; --text-subtle: #779c86; --border: #2b4a3b;
+  --accent: #76e4a0; --accent-strong: #55ca83; --accent-ink: #092116;
+}
+
+:root[data-theme="pink"] {
+  color-scheme: dark;
+  --bg: #1b1018; --surface: #261722; --surface-raised: #33202e; --surface-soft: #43283b;
+  --text: #fff1f7; --text-muted: #e0b8ca; --text-subtle: #c99bb1; --border: #59364c;
+  --accent: #ff8fc7; --accent-strong: #ff6fb8; --accent-ink: #351025; --danger: #ffaaa7;
+  --danger-bg: rgba(255, 91, 140, .14); --warning: #ffd28a; --shadow: 0 24px 80px rgba(0,0,0,.28);
+}
+
+:root[data-theme="violet"] {
+  --bg: #15121e; --surface: #201b2c; --surface-raised: #292338; --surface-soft: #342b45;
+  --text: #f6f0ff; --text-muted: #b9accd; --text-subtle: #9383ac; --border: #423653;
+  --accent: #d0a5ff; --accent-strong: #b984f3; --accent-ink: #241333;
+}
+
+:root[data-theme="blue"] {
+  color-scheme: dark;
+  --bg:#0b1424; --surface:#111f34; --surface-raised:#192b45; --surface-soft:#213854;
+  --text:#f0f6ff; --text-muted:#b1c5df; --text-subtle:#9ab0cd; --border:#35506f;
+  --accent:#73baff; --accent-strong:#4da4f5; --accent-ink:#07182a; --danger:#ffaaa7;
+  --danger-bg:rgba(255,91,79,.14); --warning:#ffd27d; --shadow:0 24px 80px rgba(0,0,0,.28);
+}
+
+:root[data-theme="pink"] .panel, :root[data-theme="pink"] input, :root[data-theme="pink"] textarea, :root[data-theme="pink"] select,
+:root[data-theme="blue"] .panel, :root[data-theme="blue"] input, :root[data-theme="blue"] textarea, :root[data-theme="blue"] select { color:var(--text); }
+
+/* Locked-In v3 — QA / responsive / information architecture polish */
+
+:root { --focus-ring: color-mix(in srgb, var(--accent) 28%, transparent); }

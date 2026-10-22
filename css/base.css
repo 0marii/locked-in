@@ -1,0 +1,48 @@
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 90px; }
+
+body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.55; transition: background .2s ease, color .2s ease; }
+
+button, input, select, textarea { font: inherit; }
+
+button, .button, select, input, textarea { touch-action: manipulation; }
+
+button, select { cursor: pointer; }
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+a { color: inherit; }
+
+.skip-link { position: absolute; top: -100px; left: 16px; z-index: 100; padding: 10px 14px; background: var(--accent); color: var(--accent-ink); border-radius: 8px; }
+
+.skip-link:focus { top: 12px; }
+
+@keyframes enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+
+.is-hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .table-scroll { scroll-behavior: auto; }
+  .table-scroll-shell.is-hinting .table-scroll {
+    filter: none;
+    transform: none;
+    transition: none;
+  }
+  .table-scroll-shell.is-hinting .table-scroll-hint,
+  .table-scroll-shell.is-hinting .table-scroll-hint-pill {
+    animation: none !important;
+  }
+  .table-scroll-shell.is-hinting .table-scroll-hint {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
+  .goal-progress-track > span { transition: none; }
+}
