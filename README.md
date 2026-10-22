@@ -24,17 +24,17 @@ A customizable, browser-based focus timer and deep-work tracker. Built with vani
 - Daily and weekly completed-focus goals with progress on Setup and Insights.
 - Recent goal chips to refill intent, duration, style, and tag.
 - Optional session tags (Study / Code / Writing / custom) with History filter.
-- Preferences: end notifications, 5-minute break reminder, completion chime (Off / Soft / Full), optional 25-minute break suggestions.
+- Preferences: end notifications, 5-minute break reminder, completion chime (Off / Soft / Full), optional break suggestions with a chosen interval.
 - Save a local weekly stats PNG from Insights (no upload).
 - History tooltips explain column meaning, completion-score math, and why an outcome was assigned.
 - Edit session notes or delete individual history records.
-- Import JSON backups and merge records by session ID.
+- Restore a backup and merge records by session ID.
 - Searchable local session history with date, tag, and sort filters.
-- CSV export and JSON backup.
+- Download a spreadsheet, save a full backup, or restore from a backup file.
 - Installable PWA shell (`manifest.webmanifest` + network-first HTML service worker).
 - Six themes: Dark, Light, Forest, Violet, Pink, and Blue.
 - Responsive layout with a mobile hamburger navigation menu.
-- Keyboard shortcuts: `B` toggles a break and `S` ends a session while the timer screen is active.
+- Keyboard shortcuts: `B` toggles a break and `S` ends a session while a session is active (when not typing in a field).
 - SEO metadata, canonical URL, Open Graph metadata, JSON-LD, `robots.txt`, `sitemap.xml`, and a custom `404.html`.
 - Respects reduced-motion preferences and includes basic keyboard accessibility support.
 
@@ -43,16 +43,43 @@ A customizable, browser-based focus timer and deep-work tracker. Built with vani
 ```text
 locked-in/
 ├── index.html
-├── style.css
-├── app.js
+├── style.css              # CSS entry (@import css/*)
+├── app.js                 # ES module entry (type="module")
+├── css/
+│   ├── tokens.css
+│   ├── base.css
+│   ├── layout.css
+│   ├── components.css
+│   ├── setup.css
+│   ├── timer.css
+│   ├── report.css
+│   ├── history.css
+│   ├── insights.css
+│   └── notes.css
+├── js/
+│   ├── constants.js
+│   ├── runtime.js
+│   ├── storage.js
+│   ├── toast.js
+│   ├── utils.js
+│   ├── sync.js
+│   ├── theme-nav.js
+│   ├── setup.js
+│   ├── session.js
+│   ├── history.js
+│   ├── insights.js
+│   ├── notes.js
+│   └── bind.js
+├── assets/
+│   ├── favicon.svg
+│   ├── icon-192.png
+│   ├── icon-512.png
+│   ├── icon-512-maskable.png
+│   ├── og-image.png
+│   └── og-image.svg
 ├── package.json
-├── favicon.svg
-├── icon-192.png
-├── icon-512.png
 ├── manifest.webmanifest
 ├── sw.js
-├── og-image.png
-├── og-image.svg
 ├── 404.html
 ├── robots.txt
 ├── sitemap.xml
@@ -61,6 +88,8 @@ locked-in/
 ├── LICENSE
 └── README.md
 ```
+
+App logic and styles are split into native modules under `js/` and `css/` (no bundler). Icons and images live in `assets/`. GitHub Pages serves them over HTTPS with relative paths.
 
 ## Run tests
 
@@ -75,6 +104,7 @@ Or run the pieces separately:
 ```bash
 node --test tests/static-contract.test.cjs
 node --check app.js
+node --check js/*.js
 ```
 
 These are source-level checks, not a substitute for manual browser and Lighthouse testing.
@@ -99,11 +129,11 @@ This project is designed for a project site hosted at `https://0marii.github.io/
 4. Wait for the Pages deployment to finish.
 5. Open the live URL and test the mobile menu, timer, history, sticky notes, insights, themes, and exports.
 
-All internal asset links use relative paths (`./style.css`, `./app.js`, `./favicon.svg`) to work under the `/locked-in/` project path.
+All internal asset links use relative paths (`./style.css`, `./app.js`, `./assets/favicon.svg`) to work under the `/locked-in/` project path.
 
 ## Privacy and storage
 
-The app stores session history, active session state, notes, preferences, focus goals, recent goals, and the selected theme in browser `localStorage`. It does not upload session information to a server. Data is specific to the browser/device and can be removed when browser data is cleared. Use **Backup JSON** to export a copy. Importing a backup merges records and retains topic/note/tag fields when present. Data remains local to your browser; do not use the app on a shared device if your session notes are private. If storage writes fail, the UI keeps drafts dirty and never claims “Saved.” Browser notifications are opt-in and only fire when permission is granted.
+The app stores session history, active session state, notes, preferences, focus goals, recent goals, and the selected theme in browser `localStorage`. It does not upload session information to a server. Data is specific to the browser/device and can be removed when browser data is cleared. Use **Save backup** to download a copy. **Restore backup** merges records and retains topic/note/tag fields when present. Data remains local to your browser; do not use the app on a shared device if your session notes are private. If storage writes fail, the UI keeps drafts dirty and never claims “Saved.” Browser notifications are opt-in and only fire when permission is granted.
 
 ## How the completion score works
 

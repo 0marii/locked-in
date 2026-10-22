@@ -1,13 +1,38 @@
 /* Locked-In service worker — network-first HTML, cache-first static assets. */
-const CACHE = "locked-in-v10";
+const CACHE = "locked-in-v59";
+const ASSET_V = "75";
 const PRECACHE = [
   "./",
   "./index.html",
-  "./style.css",
-  "./app.js",
-  "./favicon.svg",
-  "./icon-192.png",
-  "./icon-512.png",
+  `./style.css?v=${ASSET_V}`,
+  `./css/tokens.css?v=${ASSET_V}`,
+  `./css/base.css?v=${ASSET_V}`,
+  `./css/layout.css?v=${ASSET_V}`,
+  `./css/components.css?v=${ASSET_V}`,
+  `./css/setup.css?v=${ASSET_V}`,
+  `./css/timer.css?v=${ASSET_V}`,
+  `./css/report.css?v=${ASSET_V}`,
+  `./css/history.css?v=${ASSET_V}`,
+  `./css/insights.css?v=${ASSET_V}`,
+  `./css/notes.css?v=${ASSET_V}`,
+  `./app.js?v=${ASSET_V}`,
+  `./js/constants.js?v=${ASSET_V}`,
+  `./js/runtime.js?v=${ASSET_V}`,
+  `./js/storage.js?v=${ASSET_V}`,
+  `./js/toast.js?v=${ASSET_V}`,
+  `./js/utils.js?v=${ASSET_V}`,
+  `./js/sync.js?v=${ASSET_V}`,
+  `./js/theme-nav.js?v=${ASSET_V}`,
+  `./js/setup.js?v=${ASSET_V}`,
+  `./js/session.js?v=${ASSET_V}`,
+  `./js/history.js?v=${ASSET_V}`,
+  `./js/insights.js?v=${ASSET_V}`,
+  `./js/notes.js?v=${ASSET_V}`,
+  `./js/bind.js?v=${ASSET_V}`,
+  "./assets/favicon.svg",
+  "./assets/icon-192.png",
+  "./assets/icon-512.png",
+  "./assets/icon-512-maskable.png",
   "./manifest.webmanifest"
 ];
 
