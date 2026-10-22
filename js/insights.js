@@ -1,7 +1,7 @@
-import { dom, state } from "./runtime.js?v=75";
-import { showToast } from "./toast.js?v=75";
-import { completedRecords, download, formatDuration, localDayKey, scoreFor } from "./utils.js?v=75";
-import { focusProgress, renderFocusGoals } from "./setup.js?v=75";
+import { dom, state } from "./runtime.js?v=76";
+import { showToast } from "./toast.js?v=76";
+import { completedRecords, download, formatDuration, localDayKey, scoreFor } from "./utils.js?v=76";
+import { focusProgress, renderFocusGoals } from "./setup.js?v=76";
 
 export function downloadWeekCard() {
   const completed = completedRecords();
@@ -61,7 +61,9 @@ export function renderInsights() {
     const card=document.createElement("div");card.className="insight-stat";const s=document.createElement("span");s.textContent=l;const strong=document.createElement("strong");strong.textContent=v;card.append(s,strong);dom.insightsStats.append(card);
   });
   if (!attempts) {
-    dom.insightsSummary.textContent = "Start a session to build your private insights.";
+    dom.insightsSummary.textContent = state.session
+      ? "Finish this session to unlock your private insights."
+      : "Start a session to build your private insights.";
   } else if (!hasCompleted) {
     dom.insightsSummary.textContent = `${attempts} saved attempt${attempts === 1 ? "" : "s"}, 0 completed. Zeros are expected until a session reaches 70% of planned focus.`;
   } else {

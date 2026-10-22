@@ -1,12 +1,12 @@
-import { NOTES_INBOX_KEY } from "./constants.js?v=75";
-import { dom, state, tabId } from "./runtime.js?v=75";
-import { safeWrite } from "./storage.js?v=75";
-import { showToast } from "./toast.js?v=75";
-import { download, formatDate, noteFilename } from "./utils.js?v=75";
-import { broadcast } from "./sync.js?v=75";
-import { askConfirm } from "./theme-nav.js?v=75";
-import { deleteStickyNote, persistSessionNotes, renderStickyNoteList, syncStickyNotesUi } from "./session.js?v=75";
-import { renderHistory, renderReportNotesList, renderSessionNotesViewer, saveHistory, updateEditNotesSummary } from "./history.js?v=75";
+import { NOTES_INBOX_KEY } from "./constants.js?v=76";
+import { dom, state, tabId } from "./runtime.js?v=76";
+import { safeWrite } from "./storage.js?v=76";
+import { showToast } from "./toast.js?v=76";
+import { download, formatDate, noteFilename } from "./utils.js?v=76";
+import { broadcast } from "./sync.js?v=76";
+import { askConfirm } from "./theme-nav.js?v=76";
+import { deleteStickyNote, persistSessionNotes, renderStickyNoteList, syncStickyNotesUi } from "./session.js?v=76";
+import { renderHistory, renderReportNotesList, renderSessionNotesViewer, saveHistory, updateEditNotesSummary } from "./history.js?v=76";
 
 export function ensureNoteItems(session) {
   if (!session) return [];

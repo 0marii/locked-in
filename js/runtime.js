@@ -1,5 +1,5 @@
 /** Shared DOM refs and mutable app state. */
-import { DEFAULT_POMODORO_MINUTES } from "./constants.js?v=75";
+import { DEFAULT_POMODORO_MINUTES } from "./constants.js?v=76";
 
 const $ = (id) => document.getElementById(id);
 

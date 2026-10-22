@@ -1,5 +1,5 @@
-import { DEFAULT_POMODORO_MINUTES, GOAL_LIMITS, POMODORO_MINUTE_OPTIONS } from "./constants.js?v=75";
-import { state } from "./runtime.js?v=75";
+import { DEFAULT_POMODORO_MINUTES, GOAL_LIMITS, POMODORO_MINUTE_OPTIONS } from "./constants.js?v=76";
+import { state } from "./runtime.js?v=76";
 
 export function normalizePomodoroMinutes(value) {
   const mins = Math.floor(Number(value) || 0);
@@ -98,6 +98,11 @@ export function explainScore(record) {
 export function explainOutcome(record) {
   const b = scoreBreakdown(record);
   const reason = String(record.reason || "").trim();
+  if (record.outcome === "active" || record.live) {
+    return reason === "On break"
+      ? "In progress — session is active and currently on a break."
+      : "In progress — session is still running.";
+  }
   if (record.outcome === "completed") {
     return `Completed — focused ${b.completionPct}% of the plan (needs ≥70%).${reason ? ` ${reason}` : ""}`;
   }

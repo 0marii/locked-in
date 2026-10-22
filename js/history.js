@@ -1,19 +1,52 @@
-import { HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES } from "./constants.js?v=75";
-import { dom, state, tabId } from "./runtime.js?v=75";
-import { safeWrite } from "./storage.js?v=75";
-import { showToast } from "./toast.js?v=75";
-import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, toISODateLocal } from "./utils.js?v=75";
-import { broadcast } from "./sync.js?v=75";
-import { askConfirm, navigate } from "./theme-nav.js?v=75";
-import { elapsedSeconds, normalizeRecord } from "./session.js?v=75";
-import { renderInsights } from "./insights.js?v=75";
-import { applyNoteItems, createNoteItemOptions, deleteEditedNote, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, sessionNoteItems } from "./notes.js?v=75";
-import { renderAll } from "./bind.js?v=75";
+import { HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES } from "./constants.js?v=76";
+import { dom, state, tabId } from "./runtime.js?v=76";
+import { safeWrite } from "./storage.js?v=76";
+import { showToast } from "./toast.js?v=76";
+import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, toISODateLocal } from "./utils.js?v=76";
+import { broadcast } from "./sync.js?v=76";
+import { askConfirm, navigate } from "./theme-nav.js?v=76";
+import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=76";
+import { renderInsights } from "./insights.js?v=76";
+import { applyNoteItems, createNoteItemOptions, deleteEditedNote, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, sessionNoteItems } from "./notes.js?v=76";
+import { renderAll } from "./bind.js?v=76";
+
+export function liveSessionAsHistoryRow(now = Date.now()) {
+  const s = state.session;
+  if (!s) return null;
+  const focusSeconds = Math.max(0, Math.floor(activeFocusSeconds(s, now)));
+  const breakSeconds = Math.max(0, Math.floor(currentBreakSeconds(s, now)));
+  const elapsed = Math.max(0, Math.floor(elapsedSeconds(s, now)));
+  const noteItems = Array.isArray(s.noteItems) ? s.noteItems.slice() : [];
+  return {
+    id: s.id,
+    intent: s.intent,
+    tag: s.tag || "",
+    topic: s.topic || "",
+    notes: s.notes || "",
+    noteItems,
+    targetSeconds: s.targetSeconds,
+    focusSeconds,
+    elapsedSeconds: Math.max(elapsed, focusSeconds + breakSeconds),
+    breakSeconds,
+    breaks: Array.isArray(s.breaks) ? s.breaks.slice() : [],
+    completedAt: new Date(s.startedAt).toISOString(),
+    startedAt: s.startedAt,
+    outcome: "active",
+    live: true,
+    hardcore: Boolean(s.hardcore),
+    hardcoreFailed: false,
+    score: null,
+    reason: s.currentBreakStartedAt ? "On break" : "Focusing"
+  };
+}
 
 export function populateHistoryTagFilter() {
   if (!dom.historyTagFilter) return;
   const current = dom.historyTagFilter.value;
-  const tags = [...new Set(state.history.map((r) => r.tag).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const tags = [...new Set([
+    ...state.history.map((r) => r.tag).filter(Boolean),
+    ...(state.session?.tag ? [state.session.tag] : [])
+  ])].sort((a, b) => a.localeCompare(b));
   dom.historyTagFilter.replaceChildren();
   const all = document.createElement("option");
   all.value = "";
@@ -256,18 +289,25 @@ export function initDatePickers() {
   }, { passive: true });
 }
 
+function matchesHistoryFilters(r, q, from, to, tag) {
+  const text = [r.intent, r.topic, r.notes, r.outcome, r.reason, r.tag, r.live ? "in progress active focusing" : ""].join(" ").toLocaleLowerCase();
+  const d = new Date(r.completedAt);
+  return (!q || text.includes(q)) && (!from || d >= from) && (!to || d <= to) && (!tag || r.tag === tag);
+}
+
 export function getFilteredHistory() {
   const q = dom.historySearch.value.trim().toLocaleLowerCase();
   const from = dom.historyDateFrom.value ? new Date(`${dom.historyDateFrom.value}T00:00:00`) : null;
   const to = dom.historyDateTo.value ? new Date(`${dom.historyDateTo.value}T23:59:59.999`) : null;
   const tag = String(dom.historyTagFilter?.value || "").trim();
-  let rows = state.history.filter(r => {
-    const text=[r.intent,r.topic,r.notes,r.outcome,r.reason,r.tag].join(" ").toLocaleLowerCase();
-    const d=new Date(r.completedAt);
-    return (!q || text.includes(q)) && (!from || d>=from) && (!to || d<=to) && (!tag || r.tag === tag);
-  });
-  const sort=dom.historySort.value;
-  rows.sort((a,b)=>sort==="oldest" ? Date.parse(a.completedAt)-Date.parse(b.completedAt) : sort==="focus" ? b.focusSeconds-a.focusSeconds : Date.parse(b.completedAt)-Date.parse(a.completedAt));
+  let rows = state.history.filter((r) => matchesHistoryFilters(r, q, from, to, tag));
+  const sort = dom.historySort.value;
+  rows.sort((a, b) => sort === "oldest" ? Date.parse(a.completedAt) - Date.parse(b.completedAt) : sort === "focus" ? b.focusSeconds - a.focusSeconds : Date.parse(b.completedAt) - Date.parse(a.completedAt));
+  const live = liveSessionAsHistoryRow();
+  if (live && matchesHistoryFilters(live, q, from, to, tag)) {
+    // Keep the active session pinned to the top of the table.
+    rows = [live, ...rows.filter((r) => r.id !== live.id)];
+  }
   return rows;
 }
 
@@ -323,23 +363,77 @@ export function initHistoryTableScrollHint() {
   observer.observe(shell);
 }
 
+export function syncLiveHistoryRow(now = Date.now()) {
+  if (state.activeScreen !== "history-screen" || !state.session) return;
+  const tr = dom.historyTableBody?.querySelector("tr.is-live-session");
+  if (!tr) return;
+  const live = liveSessionAsHistoryRow(now);
+  if (!live) return;
+  const b = scoreBreakdown(live);
+  const focusTd = tr.querySelector('[data-label="Focus"]');
+  const elapsedTd = tr.querySelector('[data-label="Elapsed"]');
+  const scoreTd = tr.querySelector('[data-label="Completion score"]');
+  const pill = tr.querySelector(".outcome-pill");
+  if (focusTd) {
+    focusTd.textContent = formatDuration(live.focusSeconds);
+    focusTd.title = `Active focus so far: ${formatDuration(live.focusSeconds)} of ${formatDuration(live.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`;
+  }
+  if (elapsedTd) {
+    elapsedTd.textContent = formatDuration(live.elapsedSeconds);
+    elapsedTd.title = `Clock time so far including breaks: ${formatDuration(live.elapsedSeconds)} (breaks ${formatDuration(live.breakSeconds)}).`;
+  }
+  if (scoreTd) {
+    scoreTd.textContent = "—";
+    scoreTd.title = "Score is calculated when the session ends.";
+  }
+  if (pill) {
+    pill.textContent = "In progress";
+    pill.title = live.reason === "On break"
+      ? "Session is active — currently on a break."
+      : "Session is active — focusing now.";
+    pill.setAttribute("aria-label", pill.title);
+  }
+}
+
 export function renderHistory() {
   populateHistoryTagFilter();
-  const rows=getFilteredHistory();
+  const rows = getFilteredHistory();
   dom.historyTableBody.replaceChildren();
-  rows.forEach(r=>{
-    const tr=document.createElement("tr");
-    const score = scoreFor(r);
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    if (r.live) tr.classList.add("is-live-session");
+    const score = r.live ? null : scoreFor(r);
     const b = scoreBreakdown(r);
     const noteItems = sessionNoteItems(r);
     const cells = [
-      { label: "Date", text: formatDate(r.completedAt), title: `Saved ${formatDate(r.completedAt)}.` },
+      {
+        label: "Date",
+        text: formatDate(r.completedAt),
+        title: r.live ? `Started ${formatDate(r.completedAt)}.` : `Saved ${formatDate(r.completedAt)}.`
+      },
       { label: "Goal", text: r.intent, title: "Focus goal for this session." },
       { label: "Tag", text: r.tag || "—", title: r.tag ? `Tag: ${r.tag}.` : "No tag for this session." },
       { label: "Topics", text: r.topic || "—", title: r.topic ? "Topics / work tagged for this session." : "No topics saved for this session." },
-      { label: "Focus", text: formatDuration(r.focusSeconds), title: `Active focus time: ${formatDuration(r.focusSeconds)} of ${formatDuration(r.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.` },
-      { label: "Elapsed", text: formatDuration(r.elapsedSeconds), title: `Total clock time including breaks: ${formatDuration(r.elapsedSeconds)} (breaks ${formatDuration(r.breakSeconds)}).` },
-      { label: "Completion score", text: score == null ? "N/A" : `${score}%`, title: explainScore(r), explain: true }
+      {
+        label: "Focus",
+        text: formatDuration(r.focusSeconds),
+        title: r.live
+          ? `Active focus so far: ${formatDuration(r.focusSeconds)} of ${formatDuration(r.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`
+          : `Active focus time: ${formatDuration(r.focusSeconds)} of ${formatDuration(r.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`
+      },
+      {
+        label: "Elapsed",
+        text: formatDuration(r.elapsedSeconds),
+        title: r.live
+          ? `Clock time so far including breaks: ${formatDuration(r.elapsedSeconds)} (breaks ${formatDuration(r.breakSeconds)}).`
+          : `Total clock time including breaks: ${formatDuration(r.elapsedSeconds)} (breaks ${formatDuration(r.breakSeconds)}).`
+      },
+      {
+        label: "Completion score",
+        text: r.live ? "—" : score == null ? "N/A" : `${score}%`,
+        title: r.live ? "Score is calculated when the session ends." : explainScore(r),
+        explain: !r.live
+      }
     ];
     cells.forEach((cell) => {
       const td = document.createElement("td");
@@ -357,14 +451,13 @@ export function renderHistory() {
     notesTd.className = "history-notes-cell";
     if (!noteItems.length) {
       notesTd.textContent = "—";
-      notesTd.title = "No notes saved for this session.";
+      notesTd.title = r.live ? "No notes yet for this active session." : "No notes saved for this session.";
     } else {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "history-notes-btn";
       const preview = noteItems[0].text.replace(/\s+/g, " ").trim();
       const short = preview.length > 48 ? `${preview.slice(0, 48)}…` : preview;
-      btn.innerHTML = "";
       const count = document.createElement("strong");
       count.textContent = noteItems.length === 1 ? "1 note" : `${noteItems.length} notes`;
       const snippet = document.createElement("span");
@@ -375,47 +468,67 @@ export function renderHistory() {
       btn.addEventListener("click", () => openNotesFilteredToSession(r.id));
       notesTd.append(btn);
     }
-    // Keep Notes column before Focus: insert after Topics (4th data cell so far is Topics as index 3 in cells... wait we removed Notes from cells)
-    // Current order without Notes: Date Goal Tag Topics Focus Elapsed Score — need Notes after Topics
-    const focusTd = tr.children[4]; // Focus is 5th child (0-based 4) after Date,Goal,Tag,Topics
+    const focusTd = tr.children[4];
     tr.insertBefore(notesTd, focusTd);
     const out = document.createElement("td");
     out.dataset.label = "Outcome";
     const pill = document.createElement("span");
-    pill.className = `outcome-pill ${r.outcome === "completed" ? "success" : r.outcome === "failed" ? "failed" : ""}`;
-    pill.textContent = r.outcome === "completed" ? "Completed" : r.outcome === "failed" ? "Hardcore failed" : r.outcome === "incomplete" ? "Incomplete" : "Ended early";
-    pill.title = explainOutcome(r);
+    if (r.live) {
+      pill.className = "outcome-pill active";
+      pill.textContent = "In progress";
+      pill.title = r.reason === "On break"
+        ? "Session is active — currently on a break."
+        : "Session is active — focusing now.";
+    } else {
+      pill.className = `outcome-pill ${r.outcome === "completed" ? "success" : r.outcome === "failed" ? "failed" : ""}`;
+      pill.textContent = r.outcome === "completed" ? "Completed" : r.outcome === "failed" ? "Hardcore failed" : r.outcome === "incomplete" ? "Incomplete" : "Ended early";
+      pill.title = explainOutcome(r);
+    }
     pill.tabIndex = 0;
-    pill.setAttribute("aria-label", `${pill.textContent}. ${explainOutcome(r)}`);
+    pill.setAttribute("aria-label", `${pill.textContent}. ${pill.title}`);
     out.append(pill);
     tr.append(out);
     const actions = document.createElement("td");
     actions.dataset.label = "Actions";
     actions.className = "history-actions-cell";
-    const edit = document.createElement("button");
-    edit.className = "button button-secondary button-small";
-    edit.type = "button";
-    edit.textContent = "Edit";
-    edit.title = "Edit topics and notes for this session.";
-    edit.addEventListener("click", () => openEdit(r.id));
-    const del = document.createElement("button");
-    del.className = "button button-danger-outline button-small";
-    del.type = "button";
-    del.textContent = "Delete";
-    del.title = "Delete this session from local history.";
-    del.addEventListener("click", () => deleteSession(r.id));
-    actions.append(edit, del);
+    if (r.live) {
+      const resume = document.createElement("button");
+      resume.className = "button button-primary button-small";
+      resume.type = "button";
+      resume.textContent = "Return";
+      resume.title = "Return to the active timer.";
+      resume.addEventListener("click", () => navigate("timer-screen"));
+      actions.append(resume);
+    } else {
+      const edit = document.createElement("button");
+      edit.className = "button button-secondary button-small";
+      edit.type = "button";
+      edit.textContent = "Edit";
+      edit.title = "Edit topics and notes for this session.";
+      edit.addEventListener("click", () => openEdit(r.id));
+      const del = document.createElement("button");
+      del.className = "button button-danger-outline button-small";
+      del.type = "button";
+      del.textContent = "Delete";
+      del.title = "Delete this session from local history.";
+      del.addEventListener("click", () => deleteSession(r.id));
+      actions.append(edit, del);
+    }
     tr.append(actions);
     dom.historyTableBody.append(tr);
   });
-  dom.historyEmpty.classList.toggle("is-visible", rows.length===0);
-  dom.historyEmpty.querySelector("h2").textContent = state.history.length && !rows.length ? "No matching sessions" : "No sessions yet";
-  dom.historyEmpty.querySelector("p").textContent = state.history.length && !rows.length ? "Try a different search, date range, or sort." : "Completed and incomplete attempts will appear here.";
-  dom.historyStartBtn.classList.toggle("is-hidden", Boolean(state.history.length && !rows.length));
-  const completed=completedRecords();
-  dom.historyCompletedCount.textContent=String(completed.length);
-  dom.historyAttemptCount.textContent=String(state.history.length);
-  dom.historyTotalFocus.textContent=formatDuration(completed.reduce((s,r)=>s+r.focusSeconds,0));
+  const filteredEmpty = rows.length === 0;
+  const hasHistoryButFilteredOut = (state.history.length > 0 || Boolean(state.session)) && filteredEmpty;
+  dom.historyEmpty.classList.toggle("is-visible", filteredEmpty);
+  dom.historyEmpty.querySelector("h2").textContent = hasHistoryButFilteredOut ? "No matching sessions" : "No sessions yet";
+  dom.historyEmpty.querySelector("p").textContent = hasHistoryButFilteredOut
+    ? "Try a different search, date range, or sort."
+    : "Completed and incomplete attempts will appear here.";
+  dom.historyStartBtn.classList.toggle("is-hidden", hasHistoryButFilteredOut);
+  const completed = completedRecords();
+  dom.historyCompletedCount.textContent = String(completed.length);
+  dom.historyAttemptCount.textContent = String(state.history.length);
+  dom.historyTotalFocus.textContent = formatDuration(completed.reduce((s, r) => s + r.focusSeconds, 0));
   requestAnimationFrame(syncHistoryTableScroll);
 }
 

@@ -1,11 +1,11 @@
-import { THEME_KEY } from "./constants.js?v=75";
-import { dom, state } from "./runtime.js?v=75";
-import { safeWrite } from "./storage.js?v=75";
-import { renderSetup } from "./setup.js?v=75";
-import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=75";
-import { closeDatePicker, renderHistory } from "./history.js?v=75";
-import { renderInsights } from "./insights.js?v=75";
-import { renderNotes } from "./notes.js?v=75";
+import { THEME_KEY } from "./constants.js?v=76";
+import { dom, state } from "./runtime.js?v=76";
+import { safeWrite } from "./storage.js?v=76";
+import { renderSetup } from "./setup.js?v=76";
+import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=76";
+import { closeDatePicker, renderHistory } from "./history.js?v=76";
+import { renderInsights } from "./insights.js?v=76";
+import { renderNotes } from "./notes.js?v=76";
 
 export const screenMap = {
   timer: "timer-screen", history: "history-screen", insights: "insights-screen", notes: "notes-screen",
@@ -33,7 +33,8 @@ export function proceedNavigate(id, replace = false) {
   state.activeScreen = id;
   dom.screens.forEach(s => s.classList.toggle("is-active", s.id === id));
   dom.navLinks.forEach(link => {
-    const active = link.dataset.screen === id;
+    const active = link.dataset.screen === id
+      || (id === "timer-screen" && link.dataset.screen === "setup-screen");
     link.classList.toggle("is-active", active);
     if (active) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
   });
@@ -64,6 +65,8 @@ export function proceedNavigate(id, replace = false) {
 
 export function navigate(id, replace = false) {
   if (!validScreen(id)) id = "setup-screen";
+  // Setup is only for starting a session — send an active session back to the timer.
+  if (id === "setup-screen" && state.session) id = "timer-screen";
   if (state.reportDirty && state.activeScreen === "report-screen" && id !== "report-screen") {
     const pendingId = id;
     const reportUrl = `${location.pathname}${location.search}#report`;

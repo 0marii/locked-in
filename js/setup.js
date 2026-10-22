@@ -1,10 +1,10 @@
-import { ACTIVE_SESSION_KEY, DEFAULT_POMODORO_MINUTES, FOCUS_GOALS_KEY, GOAL_LIMITS, HISTORY_KEY, LEGACY_HISTORY_KEYS, MAX_HISTORY, NOTES_INBOX_KEY, PREFS_KEY, RECENT_GOALS_KEY } from "./constants.js?v=75";
-import { dom, state } from "./runtime.js?v=75";
-import { safeRead, safeWrite } from "./storage.js?v=75";
-import { showToast } from "./toast.js?v=75";
-import { clampGoalMinutes, completedRecords, formatClock, formatDuration, formatGoalClock, normalizePomodoroMinutes, startOfWeek } from "./utils.js?v=75";
-import { normalizeRecord } from "./session.js?v=75";
-import { drawHeatmap } from "./insights.js?v=75";
+import { ACTIVE_SESSION_KEY, DEFAULT_POMODORO_MINUTES, FOCUS_GOALS_KEY, GOAL_LIMITS, HISTORY_KEY, LEGACY_HISTORY_KEYS, MAX_HISTORY, NOTES_INBOX_KEY, PREFS_KEY, RECENT_GOALS_KEY } from "./constants.js?v=76";
+import { dom, state } from "./runtime.js?v=76";
+import { safeRead, safeWrite } from "./storage.js?v=76";
+import { showToast } from "./toast.js?v=76";
+import { clampGoalMinutes, completedRecords, formatClock, formatDuration, formatGoalClock, normalizePomodoroMinutes, startOfWeek } from "./utils.js?v=76";
+import { normalizeRecord } from "./session.js?v=76";
+import { drawHeatmap } from "./insights.js?v=76";
 
 export const CHIME_HINTS = {
   off: "No sound when a session completes.",

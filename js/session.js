@@ -1,13 +1,13 @@
-import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=75";
-import { dom, state, tabId } from "./runtime.js?v=75";
-import { safeRead, safeWrite } from "./storage.js?v=75";
-import { showToast } from "./toast.js?v=75";
-import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=75";
-import { broadcast } from "./sync.js?v=75";
-import { navigate } from "./theme-nav.js?v=75";
-import { currentTagValue, pomodoroIntervalSeconds, rememberRecentGoal, renderRecentGoals, resetSetupFormDefaults } from "./setup.js?v=75";
-import { renderReportNotesList, saveHistory } from "./history.js?v=75";
-import { composeNotesText, ensureNoteItems, refreshNotesSurfaces } from "./notes.js?v=75";
+import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=76";
+import { dom, state, tabId } from "./runtime.js?v=76";
+import { safeRead, safeWrite } from "./storage.js?v=76";
+import { showToast } from "./toast.js?v=76";
+import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=76";
+import { broadcast } from "./sync.js?v=76";
+import { navigate } from "./theme-nav.js?v=76";
+import { currentTagValue, pomodoroIntervalSeconds, rememberRecentGoal, renderRecentGoals, resetSetupFormDefaults } from "./setup.js?v=76";
+import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=76";
+import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=76";
 
 export function normalizeRecord(record) {
   if (!record || typeof record !== "object") return null;
@@ -253,7 +253,7 @@ export function renderStickyNoteList() {
     dom.stickyNotesList.append(empty);
     return;
   }
-  items.forEach((item) => {
+  items.forEach((item, index) => {
     const li = document.createElement("li");
     li.className = "sticky-note-item";
     const text = document.createElement("p");
@@ -262,13 +262,33 @@ export function renderStickyNoteList() {
     meta.className = "sticky-note-item-meta";
     const time = document.createElement("small");
     time.textContent = formatDate(item.createdAt);
-    const del = document.createElement("button");
-    del.type = "button";
-    del.className = "sticky-note-delete";
-    del.setAttribute("aria-label", "Delete note");
-    del.textContent = "Delete";
-    del.addEventListener("click", () => deleteStickyNote(item.id));
-    meta.append(time, del);
+    const actions = document.createElement("div");
+    actions.className = "note-card-actions";
+    const session = state.session;
+    actions.append(createNoteItemOptions({
+      text: item.text,
+      label: `${session?.intent || "session"}-${index + 1}`,
+      onEdit: () => openNoteEditor({
+        scope: "live",
+        sessionId: session.id,
+        noteId: item.id,
+        intent: session.intent,
+        live: true,
+        text: item.text
+      }),
+      onDelete: () => {
+        state.editingNote = {
+          scope: "live",
+          sessionId: session.id,
+          noteId: item.id,
+          intent: session.intent,
+          live: true,
+          text: item.text
+        };
+        deleteEditedNote();
+      }
+    }));
+    meta.append(time, actions);
     li.append(text, meta);
     dom.stickyNotesList.append(li);
   });
@@ -391,6 +411,7 @@ function currentBreakElapsedSeconds(s, now = Date.now()) {
 }
 
 export function syncFloatingTimer(now = Date.now()) {
+  syncLiveHistoryRow(now);
   if (!dom.floatingTimer) return;
   const show = Boolean(state.session) && state.activeScreen !== "timer-screen";
   dom.floatingTimer.hidden = !show;
