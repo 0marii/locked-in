@@ -1,11 +1,11 @@
-import { THEME_KEY } from "./constants.js?v=76";
-import { dom, state } from "./runtime.js?v=76";
-import { safeWrite } from "./storage.js?v=76";
-import { renderSetup } from "./setup.js?v=76";
-import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=76";
-import { closeDatePicker, renderHistory } from "./history.js?v=76";
-import { renderInsights } from "./insights.js?v=76";
-import { renderNotes } from "./notes.js?v=76";
+import { THEME_KEY } from "./constants.js?v=78";
+import { dom, state } from "./runtime.js?v=78";
+import { safeWrite } from "./storage.js?v=78";
+import { renderSetup } from "./setup.js?v=78";
+import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=78";
+import { closeDatePicker, renderHistory } from "./history.js?v=78";
+import { renderInsights } from "./insights.js?v=78";
+import { renderNotes } from "./notes.js?v=78";
 
 export const screenMap = {
   timer: "timer-screen", history: "history-screen", insights: "insights-screen", notes: "notes-screen",

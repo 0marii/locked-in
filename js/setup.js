@@ -1,10 +1,10 @@
-import { ACTIVE_SESSION_KEY, DEFAULT_POMODORO_MINUTES, FOCUS_GOALS_KEY, GOAL_LIMITS, HISTORY_KEY, LEGACY_HISTORY_KEYS, MAX_HISTORY, NOTES_INBOX_KEY, PREFS_KEY, RECENT_GOALS_KEY } from "./constants.js?v=76";
-import { dom, state } from "./runtime.js?v=76";
-import { safeRead, safeWrite } from "./storage.js?v=76";
-import { showToast } from "./toast.js?v=76";
-import { clampGoalMinutes, completedRecords, formatClock, formatDuration, formatGoalClock, normalizePomodoroMinutes, startOfWeek } from "./utils.js?v=76";
-import { normalizeRecord } from "./session.js?v=76";
-import { drawHeatmap } from "./insights.js?v=76";
+import { ACTIVE_SESSION_KEY, DEFAULT_POMODORO_MINUTES, FOCUS_GOALS_KEY, GOAL_LIMITS, HISTORY_KEY, LEGACY_HISTORY_KEYS, MAX_HISTORY, NOTES_INBOX_KEY, PREFS_KEY, RECENT_GOALS_KEY } from "./constants.js?v=78";
+import { dom, state } from "./runtime.js?v=78";
+import { safeRead, safeWrite } from "./storage.js?v=78";
+import { showToast } from "./toast.js?v=78";
+import { clampGoalMinutes, completedRecords, formatClock, formatDuration, formatGoalClock, normalizePomodoroMinutes, startOfWeek } from "./utils.js?v=78";
+import { normalizeRecord } from "./session.js?v=78";
+import { drawHeatmap } from "./insights.js?v=78";
 
 export const CHIME_HINTS = {
   off: "No sound when a session completes.",
@@ -121,11 +121,13 @@ export function syncChimeHint() {
   dom.prefChimeHint.textContent = CHIME_HINTS[selectedChimeMode()] || CHIME_HINTS.soft;
 }
 
+export const DEFAULT_FOCUS_GOALS = { dailyMinutes: 120, weeklyMinutes: 600 };
+
 export function loadFocusGoals() {
   const g = safeRead(FOCUS_GOALS_KEY, null);
   state.focusGoals = {
-    dailyMinutes: clampGoalMinutes("daily", g?.dailyMinutes ?? 120),
-    weeklyMinutes: clampGoalMinutes("weekly", g?.weeklyMinutes ?? 600)
+    dailyMinutes: clampGoalMinutes("daily", g?.dailyMinutes ?? DEFAULT_FOCUS_GOALS.dailyMinutes),
+    weeklyMinutes: clampGoalMinutes("weekly", g?.weeklyMinutes ?? DEFAULT_FOCUS_GOALS.weeklyMinutes)
   };
 }
 
@@ -174,6 +176,32 @@ export function draftFocusGoalsFromDom() {
   };
 }
 
+export function syncFocusGoalsDirtyUi() {
+  const dirty = Boolean(state.focusGoalsDirty);
+  const panel = dom.focusGoalsPanel || document.getElementById("focus-goals-panel");
+  panel?.classList.toggle("is-dirty", dirty);
+  if (dom.focusGoalsActions) {
+    dom.focusGoalsActions.hidden = !dirty;
+  }
+}
+
+export function setFocusGoalsDirty(dirty, { notify = false } = {}) {
+  const next = Boolean(dirty);
+  const becameDirty = next && !state.focusGoalsDirty;
+  state.focusGoalsDirty = next;
+  syncFocusGoalsDirtyUi();
+  if (notify && becameDirty) {
+    showToast("Save to apply your new goals.");
+  }
+}
+
+export function markFocusGoalsEdited() {
+  const draft = draftFocusGoalsFromDom();
+  const dirty = draft.dailyMinutes !== state.focusGoals.dailyMinutes
+    || draft.weeklyMinutes !== state.focusGoals.weeklyMinutes;
+  setFocusGoalsDirty(dirty, { notify: dirty });
+}
+
 export function saveFocusGoalsFromDom() {
   const next = draftFocusGoalsFromDom();
   state.focusGoals = next;
@@ -181,9 +209,17 @@ export function saveFocusGoalsFromDom() {
     showToast("Could not save focus goals — browser storage unavailable.");
     return false;
   }
+  setFocusGoalsDirty(false);
   renderFocusGoals();
   showToast("Focus goals saved.");
   return true;
+}
+
+export function restoreFocusGoalsDefault() {
+  syncGoalEditor("daily", DEFAULT_FOCUS_GOALS.dailyMinutes);
+  syncGoalEditor("weekly", DEFAULT_FOCUS_GOALS.weeklyMinutes);
+  markFocusGoalsEdited();
+  showToast("Goals reset to 2h daily / 10h weekly. Save to apply.");
 }
 
 export function loadRecentGoals() {
@@ -287,12 +323,16 @@ export function renderFocusGoals() {
   if (dom.setupDailyProgressLabel) dom.setupDailyProgressLabel.textContent = dailyLabel;
   if (dom.setupDailyProgressBar) dom.setupDailyProgressBar.style.width = `${dailyPct}%`;
   if (dom.setupWeeklyProgressHint) dom.setupWeeklyProgressHint.textContent = `This week: ${weeklyLabel}`;
-  syncGoalEditor("daily", state.focusGoals.dailyMinutes);
-  syncGoalEditor("weekly", state.focusGoals.weeklyMinutes);
+  // Keep in-progress edits when the panel is dirty; only sync editors from saved goals when clean.
+  if (!state.focusGoalsDirty) {
+    syncGoalEditor("daily", state.focusGoals.dailyMinutes);
+    syncGoalEditor("weekly", state.focusGoals.weeklyMinutes);
+  }
   if (dom.insightsDailyProgressBar) dom.insightsDailyProgressBar.style.width = `${dailyPct}%`;
   if (dom.insightsDailyProgressLabel) dom.insightsDailyProgressLabel.textContent = `${dailyLabel} today`;
   if (dom.insightsWeeklyProgressBar) dom.insightsWeeklyProgressBar.style.width = `${weeklyPct}%`;
   if (dom.insightsWeeklyProgressLabel) dom.insightsWeeklyProgressLabel.textContent = `${weeklyLabel} this week`;
+  syncFocusGoalsDirtyUi();
 }
 
 export function renderRecentGoals() {

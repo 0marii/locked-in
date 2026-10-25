@@ -1,5 +1,5 @@
-import { DEFAULT_POMODORO_MINUTES, GOAL_LIMITS, POMODORO_MINUTE_OPTIONS } from "./constants.js?v=76";
-import { state } from "./runtime.js?v=76";
+import { DEFAULT_POMODORO_MINUTES, GOAL_LIMITS, POMODORO_MINUTE_OPTIONS } from "./constants.js?v=78";
+import { state } from "./runtime.js?v=78";
 
 export function normalizePomodoroMinutes(value) {
   const mins = Math.floor(Number(value) || 0);

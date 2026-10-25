@@ -540,11 +540,17 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; col
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface-raised);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.focus-goals-panel.is-dirty .focus-goal-block {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--warning) 22%, transparent);
 }
 
 .goal-editor-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
@@ -555,11 +561,52 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; col
   font-size: 13px;
 }
 
+.focus-goals-options {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
 .goal-editor-head strong {
   font: 750 22px var(--mono);
   color: var(--accent);
   letter-spacing: -.03em;
   white-space: nowrap;
+  transition: color .18s ease;
+}
+
+.focus-goals-panel.is-dirty .goal-editor-head strong {
+  color: var(--warning);
+}
+
+.focus-goals-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.focus-goals-actions[hidden] {
+  display: none !important;
+}
+
+.focus-goals-hint {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface));
+  color: var(--warning);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.focus-goals-save-btn {
+  width: 100%;
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: .01em;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .goal-slider {

@@ -1,14 +1,14 @@
-import { HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES } from "./constants.js?v=76";
-import { dom, state, tabId } from "./runtime.js?v=76";
-import { safeWrite } from "./storage.js?v=76";
-import { showToast } from "./toast.js?v=76";
-import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, toISODateLocal } from "./utils.js?v=76";
-import { broadcast } from "./sync.js?v=76";
-import { askConfirm, navigate } from "./theme-nav.js?v=76";
-import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=76";
-import { renderInsights } from "./insights.js?v=76";
-import { applyNoteItems, createNoteItemOptions, deleteEditedNote, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, sessionNoteItems } from "./notes.js?v=76";
-import { renderAll } from "./bind.js?v=76";
+import { HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES } from "./constants.js?v=78";
+import { dom, state, tabId } from "./runtime.js?v=78";
+import { safeWrite } from "./storage.js?v=78";
+import { showToast } from "./toast.js?v=78";
+import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, toISODateLocal } from "./utils.js?v=78";
+import { broadcast } from "./sync.js?v=78";
+import { askConfirm, navigate } from "./theme-nav.js?v=78";
+import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=78";
+import { renderInsights } from "./insights.js?v=78";
+import { applyNoteItems, createNoteItemOptions, deleteEditedNote, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, sessionNoteItems } from "./notes.js?v=78";
+import { renderAll } from "./bind.js?v=78";
 
 export function liveSessionAsHistoryRow(now = Date.now()) {
   const s = state.session;

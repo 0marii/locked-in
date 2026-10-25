@@ -1,4 +1,4 @@
-import { showToast } from "./toast.js?v=76";
+import { showToast } from "./toast.js?v=78";
 
 export function safeRead(key, fallback) {
   try {

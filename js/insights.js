@@ -1,7 +1,7 @@
-import { dom, state } from "./runtime.js?v=76";
-import { showToast } from "./toast.js?v=76";
-import { completedRecords, download, formatDuration, localDayKey, scoreFor } from "./utils.js?v=76";
-import { focusProgress, renderFocusGoals } from "./setup.js?v=76";
+import { dom, state } from "./runtime.js?v=78";
+import { showToast } from "./toast.js?v=78";
+import { completedRecords, download, formatDuration, localDayKey, scoreFor } from "./utils.js?v=78";
+import { focusProgress, renderFocusGoals } from "./setup.js?v=78";
 
 export function downloadWeekCard() {
   const completed = completedRecords();

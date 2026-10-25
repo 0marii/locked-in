@@ -1,11 +1,11 @@
-import { ACTIVE_SESSION_KEY, CHANNEL_NAME, HISTORY_KEY, NOTES_INBOX_KEY } from "./constants.js?v=76";
-import { state, tabId } from "./runtime.js?v=76";
-import { safeRead } from "./storage.js?v=76";
-import { showToast } from "./toast.js?v=76";
-import { navigate } from "./theme-nav.js?v=76";
-import { loadData } from "./setup.js?v=76";
-import { stopTimerLoop } from "./session.js?v=76";
-import { renderAll } from "./bind.js?v=76";
+import { ACTIVE_SESSION_KEY, CHANNEL_NAME, HISTORY_KEY, NOTES_INBOX_KEY } from "./constants.js?v=78";
+import { state, tabId } from "./runtime.js?v=78";
+import { safeRead } from "./storage.js?v=78";
+import { showToast } from "./toast.js?v=78";
+import { navigate } from "./theme-nav.js?v=78";
+import { loadData } from "./setup.js?v=78";
+import { stopTimerLoop } from "./session.js?v=78";
+import { renderAll } from "./bind.js?v=78";
 
 export function broadcast(message) {
   try { state.channel?.postMessage(message); } catch (_) {}

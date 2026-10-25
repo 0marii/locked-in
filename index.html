@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-title" content="Locked-In">
   <meta name="author" content="Mohammad Al-Omari">
   <meta name="color-scheme" content="dark light">
-  <link rel="stylesheet" href="./style.css?v=76">
+  <link rel="stylesheet" href="./style.css?v=78">
   
   <!-- Prevent Theme FOUC -->
   <script>
@@ -59,7 +59,7 @@
   }
   </script>
   
-  <script type="module" src="./app.js?v=76"></script>
+  <script type="module" src="./app.js?v=78"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
@@ -525,7 +525,7 @@
       <section class="panel insight-panel focus-goals-panel" id="focus-goals-panel">
         <div class="panel-heading">
           <div><p class="eyebrow">FOCUS GOALS</p><h2>Daily & weekly targets</h2></div>
-          <button class="button button-secondary button-small" id="share-week-card-btn" type="button">Save week card</button>
+          <div id="focus-goals-options" class="note-card-actions focus-goals-options"></div>
         </div>
         <div class="focus-goals-grid">
           <div class="focus-goal-block" data-goal="daily">
@@ -567,7 +567,10 @@
             <div class="goal-progress-track" aria-hidden="true"><span id="insights-weekly-progress-bar"></span></div>
           </div>
         </div>
-        <button class="button button-secondary button-small" id="save-focus-goals-btn" type="button">Save goals</button>
+        <div class="focus-goals-actions" id="focus-goals-actions" hidden>
+          <p class="focus-goals-hint" id="focus-goals-hint" role="status" aria-live="polite">Unsaved changes — save to update your progress.</p>
+          <button class="button button-primary focus-goals-save-btn" id="save-focus-goals-btn" type="button">Save goals</button>
+        </div>
       </section>
       <div class="panel insights-empty-patterns" id="insights-empty-patterns" hidden>
         <p class="eyebrow">PATTERNS</p>

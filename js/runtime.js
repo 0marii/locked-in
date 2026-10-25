@@ -1,5 +1,5 @@
 /** Shared DOM refs and mutable app state. */
-import { DEFAULT_POMODORO_MINUTES } from "./constants.js?v=76";
+import { DEFAULT_POMODORO_MINUTES } from "./constants.js?v=78";
 
 const $ = (id) => document.getElementById(id);
 
@@ -30,7 +30,9 @@ export function bindDom() {
     goalWeeklySlider: $("goal-weekly-slider"), goalWeeklyHours: $("goal-weekly-hours"), goalWeeklyMins: $("goal-weekly-mins"), goalWeeklyDisplay: $("goal-weekly-display"),
     insightsDailyProgressBar: $("insights-daily-progress-bar"), insightsDailyProgressLabel: $("insights-daily-progress-label"),
     insightsWeeklyProgressBar: $("insights-weekly-progress-bar"), insightsWeeklyProgressLabel: $("insights-weekly-progress-label"),
-    saveFocusGoalsBtn: $("save-focus-goals-btn"), shareWeekCardBtn: $("share-week-card-btn"), bestTag: $("best-tag"),
+    saveFocusGoalsBtn: $("save-focus-goals-btn"), focusGoalsActions: $("focus-goals-actions"),
+    focusGoalsHint: $("focus-goals-hint"), focusGoalsPanel: $("focus-goals-panel"),
+    focusGoalsOptions: $("focus-goals-options"), bestTag: $("best-tag"),
     setupCompletedCount: $("setup-completed-count"), setupAllCount: $("setup-all-count"), setupTotalFocus: $("setup-total-focus"),
     activeSessionBanner: $("active-session-banner"), activeSessionLabel: $("active-session-label"), resumeSessionBtn: $("resume-session-btn"),
     floatingTimer: $("floating-timer"), floatingTimerBadge: $("floating-timer-badge"), floatingTimerStatus: $("floating-timer-status"),
@@ -120,6 +122,7 @@ export const state = {
     showSetupHeatmap: true
   },
   focusGoals: { dailyMinutes: 120, weeklyMinutes: 600 },
+  focusGoalsDirty: false,
   recentGoals: [],
   breakReminderTimer: null,
   pomodoroNotifiedBucket: -1,
