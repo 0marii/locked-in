@@ -1,12 +1,14 @@
 /** Customize pack: colors, fonts, nav SVG icons, export/import. */
-import { CUSTOMIZE_KEY, MAX_SVG_BYTES, THEME_KEY } from "./constants.js?v=140";
-import { dom, state } from "./runtime.js?v=140";
-import { safeRead, safeWrite } from "./storage.js?v=140";
-import { showToast } from "./toast.js?v=140";
-import { download } from "./utils.js?v=140";
+import { CUSTOMIZE_KEY, MAX_SVG_BYTES, MAX_USER_THEMES, THEME_KEY, USER_THEMES_KEY } from "./constants.js?v=187";
+import { dom, state } from "./runtime.js?v=187";
+import { safeRead, safeWrite } from "./storage.js?v=187";
+import { showToast } from "./toast.js?v=187";
+import { download } from "./utils.js?v=187";
 
 export const COLOR_ROLES = ["bg", "surface", "text", "accent", "navBg", "navText"];
-export const NAV_ICON_KEYS = ["setup", "history", "insights", "notes", "todos", "customize"];
+export const NAV_ICON_KEYS = ["setup", "history", "insights", "notes", "todos", "customize", "settings"];
+
+export const DEFAULT_SETTINGS_NAV_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
 
 /**
  * Suggested themes adapted from Adobe Color explore (community dark / mood palettes).
@@ -268,6 +270,18 @@ export function clearCustomCssVars() {
   const root = document.documentElement;
   COLOR_VARS.forEach(([, cssVar]) => root.style.removeProperty(cssVar));
   root.style.removeProperty("--font");
+  root.style.removeProperty("color-scheme");
+}
+
+/** Keep native controls (selects, inputs) in sync with a custom page background. */
+export function syncDocumentColorScheme(bgHex) {
+  const root = document.documentElement;
+  const hex = String(bgHex || "").trim();
+  if (!hex || !hexToRgb(hex)) {
+    root.style.removeProperty("color-scheme");
+    return;
+  }
+  root.style.colorScheme = relativeLuminance(hex) > 0.45 ? "light" : "dark";
 }
 
 /** Lift/sink surface away from the page background so cards stay visible. */
@@ -335,6 +349,7 @@ export function applyCustomizePack(pack = state.customizePack) {
       if (colors[key]) root.style.setProperty(cssVar, colors[key]);
     });
     if (p.font.color) root.style.setProperty("--text", p.font.color);
+    syncDocumentColorScheme(colors.bg || colors.surface);
   }
 
   const stack = FONT_FAMILIES[p.font.family] || FONT_FAMILIES.system;
@@ -358,6 +373,9 @@ export function applyNavIcons(icons = state.customizePack?.icons) {
     if (svg) {
       el.innerHTML = svg;
       el.hidden = false;
+    } else if (key === "settings") {
+      el.innerHTML = DEFAULT_SETTINGS_NAV_ICON;
+      el.hidden = false;
     } else {
       el.replaceChildren();
       el.hidden = true;
@@ -366,15 +384,322 @@ export function applyNavIcons(icons = state.customizePack?.icons) {
   syncIconPreviews(map);
 }
 
-export function enterCustomMode() {
+export function syncCustomizeSaveReminder(needsSave = state.customizeNeedsSave) {
+  const on = Boolean(needsSave);
+  state.customizeNeedsSave = on;
+  const el = dom.customizeSaveReminder;
+  if (el) {
+    el.hidden = !on;
+    el.classList.toggle("is-hidden", !on);
+  }
+  dom.customizeSaveThemeBtn?.classList.toggle("is-needs-save", on);
+  return on;
+}
+
+const PRESET_THEME_IDS = ["dark", "light", "forest", "violet", "pink", "blue"];
+
+function captureCustomizeRestorePoint() {
+  if (state.customizeRestore) return;
+  const pack = state.customizePack || loadCustomizePack();
+  const packSnap = snapshotPack(pack);
+  const base = document.documentElement.dataset.theme;
+  if (state.activeUserThemeId) {
+    state.customizeRestore = { kind: "user", id: state.activeUserThemeId, pack: packSnap };
+    return;
+  }
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
+  if (saved === "custom" || pack?.mode === "custom") {
+    state.customizeRestore = {
+      kind: "custom",
+      pack: packSnap,
+      baseTheme: PRESET_THEME_IDS.includes(base) ? base : "dark"
+    };
+    return;
+  }
+  const theme = PRESET_THEME_IDS.includes(saved)
+    ? saved
+    : (PRESET_THEME_IDS.includes(base) ? base : "dark");
+  state.customizeRestore = { kind: "preset", theme, pack: packSnap };
+}
+
+export function clearCustomizeRestorePoint() {
+  state.customizeRestore = null;
+}
+
+/** Revert Customize edits to the theme that was active when editing began. */
+export function restoreCustomizeBeforeEdits() {
+  const restore = state.customizeRestore;
+  state.customizeRestore = null;
+  setCustomizeNeedsSave(false);
+
+  if (!restore) {
+    const base = PRESET_THEME_IDS.includes(document.documentElement.dataset.theme)
+      ? document.documentElement.dataset.theme
+      : "dark";
+    document.documentElement.dataset.theme = base;
+    switchToPresetTheme();
+    try { localStorage.setItem(THEME_KEY, base); } catch (_) {}
+    document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
+    return { kind: "preset", theme: base };
+  }
+
+  if (restore.kind === "user" && restore.id) {
+    if (applyUserTheme(restore.id)) {
+      document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
+      return { kind: "user", id: restore.id };
+    }
+    document.documentElement.dataset.theme = "dark";
+    switchToPresetTheme();
+    try { localStorage.setItem(THEME_KEY, "dark"); } catch (_) {}
+    document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
+    return { kind: "preset", theme: "dark" };
+  }
+
+  if (restore.kind === "custom" && restore.pack) {
+    const base = PRESET_THEME_IDS.includes(restore.baseTheme) ? restore.baseTheme : "dark";
+    document.documentElement.dataset.theme = base;
+    const pack = normalizePack({
+      version: 1,
+      mode: "custom",
+      colors: restore.pack.colors,
+      font: restore.pack.font,
+      icons: restore.pack.icons
+    });
+    pack.colors = { ...pack.colors, ...deriveColors(pack.colors) };
+    state.activeUserThemeId = null;
+    state.customizePack = pack;
+    saveCustomizePack(pack);
+    applyCustomizePack(pack);
+    try { localStorage.setItem(THEME_KEY, "custom"); } catch (_) {}
+    syncCustomizeForm(pack);
+    document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
+    return { kind: "custom" };
+  }
+
+  const theme = PRESET_THEME_IDS.includes(restore.theme) ? restore.theme : "dark";
+  document.documentElement.dataset.theme = theme;
+  const presetPack = normalizePack({
+    version: 1,
+    mode: "preset",
+    colors: restore.pack?.colors || {},
+    font: restore.pack?.font || { family: "system", color: null },
+    icons: restore.pack?.icons || {}
+  });
+  Object.keys(presetPack.colors).forEach((key) => { presetPack.colors[key] = null; });
+  presetPack.font.color = null;
+  state.activeUserThemeId = null;
+  state.customizePack = presetPack;
+  saveCustomizePack(presetPack);
+  clearCustomCssVars();
+  applyNavIcons(presetPack.icons);
+  const stack = FONT_FAMILIES[presetPack.font.family] || FONT_FAMILIES.system;
+  if (presetPack.font.family !== "system") document.documentElement.style.setProperty("--font", stack);
+  else document.documentElement.style.removeProperty("--font");
+  try { localStorage.setItem(THEME_KEY, theme); } catch (_) {}
+  syncCustomizeForm(presetPack);
+  document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
+  return { kind: "preset", theme };
+}
+
+export function setCustomizeNeedsSave(needsSave, { toast = false } = {}) {
+  const was = Boolean(state.customizeNeedsSave);
+  const next = Boolean(needsSave);
+  syncCustomizeSaveReminder(next);
+  if (!next) clearCustomizeRestorePoint();
+  if (next && !was && toast) {
+    showToast("Save to My Themes — or export — or switching themes can lose these edits.");
+  }
+  return next;
+}
+
+export function enterCustomMode({ remind = true } = {}) {
+  // Snapshot the prior theme before detaching from a named/preset look.
+  if (remind && !state.customizeNeedsSave) captureCustomizeRestorePoint();
   const pack = state.customizePack || loadCustomizePack();
   pack.mode = "custom";
   state.customizePack = pack;
+  // Edits detach from a named theme until the user saves again.
+  if (state.activeUserThemeId) {
+    state.activeUserThemeId = null;
+    try {
+      const saved = localStorage.getItem(THEME_KEY) || "";
+      if (saved.startsWith("user:")) localStorage.setItem(THEME_KEY, "custom");
+    } catch (_) {}
+    document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
+  }
+  if (remind) setCustomizeNeedsSave(true, { toast: true });
+}
+
+export function userThemeKey(id) {
+  return `user:${id}`;
+}
+
+export function parseUserThemeKey(value) {
+  const raw = String(value || "");
+  if (!raw.startsWith("user:")) return null;
+  const id = raw.slice(5);
+  return id || null;
+}
+
+function snapshotPack(pack = state.customizePack) {
+  const p = normalizePack(pack || loadCustomizePack());
+  return {
+    colors: { ...p.colors },
+    font: { family: p.font.family, color: p.font.color },
+    icons: { ...p.icons }
+  };
+}
+
+function normalizeUserTheme(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const name = String(raw.name || "").trim().slice(0, 40);
+  const id = String(raw.id || "").trim();
+  if (!name || !id) return null;
+  const pack = normalizePack({
+    version: 1,
+    mode: "custom",
+    colors: raw.pack?.colors || raw.colors || {},
+    font: raw.pack?.font || raw.font || {},
+    icons: raw.pack?.icons || raw.icons || {}
+  });
+  return {
+    id,
+    name,
+    pack: snapshotPack(pack),
+    updatedAt: raw.updatedAt || new Date().toISOString()
+  };
+}
+
+export function loadUserThemes() {
+  const raw = safeRead(USER_THEMES_KEY, []);
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeUserTheme).filter(Boolean).slice(0, MAX_USER_THEMES);
+}
+
+export function saveUserThemes(list) {
+  const next = (Array.isArray(list) ? list : []).map(normalizeUserTheme).filter(Boolean).slice(0, MAX_USER_THEMES);
+  const ok = safeWrite(USER_THEMES_KEY, next);
+  if (!ok) showToast("Could not save themes — browser storage unavailable.");
+  return ok;
+}
+
+export function findUserTheme(id) {
+  return loadUserThemes().find((t) => t.id === id) || null;
+}
+
+export function findUserThemeByName(name) {
+  const needle = String(name || "").trim().toLowerCase();
+  if (!needle) return null;
+  return loadUserThemes().find((t) => t.name.toLowerCase() === needle) || null;
+}
+
+function uidTheme() {
+  return `utm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Persist current look under a user-chosen name (create or update by name). */
+export function saveCurrentLookAsTheme(name) {
+  const trimmed = String(name || "").trim().slice(0, 40);
+  if (!trimmed) {
+    showToast("Enter a theme name.");
+    return null;
+  }
+  const pack = state.customizePack || loadCustomizePack();
+  if (pack.mode !== "custom") {
+    enterCustomMode({ remind: false });
+  }
+  // Re-enter without clearing the id we're about to set: temporarily skip detach.
+  const snap = snapshotPack(state.customizePack);
+  // Ensure mode custom and derived colors filled.
+  const live = normalizePack({ ...state.customizePack, mode: "custom", colors: snap.colors, font: snap.font, icons: snap.icons });
+  live.colors = { ...live.colors, ...deriveColors(live.colors) };
+  state.customizePack = live;
+  saveCustomizePack(live);
+
+  const list = loadUserThemes();
+  const existing = findUserThemeByName(trimmed);
+  let entry;
+  let updated = false;
+  if (existing) {
+    entry = {
+      ...existing,
+      name: trimmed,
+      pack: snapshotPack(live),
+      updatedAt: new Date().toISOString()
+    };
+    const idx = list.findIndex((t) => t.id === existing.id);
+    if (idx >= 0) list[idx] = entry;
+    updated = true;
+  } else {
+    if (list.length >= MAX_USER_THEMES) {
+      showToast(`You can save up to ${MAX_USER_THEMES} themes. Delete one first.`);
+      return null;
+    }
+    entry = {
+      id: uidTheme(),
+      name: trimmed,
+      pack: snapshotPack(live),
+      updatedAt: new Date().toISOString()
+    };
+    list.unshift(entry);
+  }
+  if (!saveUserThemes(list)) return null;
+
+  state.activeUserThemeId = entry.id;
+  try { localStorage.setItem(THEME_KEY, userThemeKey(entry.id)); } catch (_) {}
+  setCustomizeNeedsSave(false);
+  document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
+  document.dispatchEvent(new CustomEvent("locked-in:user-themes-changed"));
+  showToast(updated ? `Updated “${entry.name}”.` : `Saved “${entry.name}”.`);
+  return entry;
+}
+
+export function applyUserTheme(id) {
+  const theme = findUserTheme(id);
+  if (!theme) {
+    showToast("That theme is no longer saved.");
+    return false;
+  }
+  const pack = normalizePack({
+    version: 1,
+    mode: "custom",
+    colors: theme.pack.colors,
+    font: theme.pack.font,
+    icons: theme.pack.icons
+  });
+  pack.colors = { ...pack.colors, ...deriveColors(pack.colors) };
+  // Set active id before apply so enterCustomMode isn't triggered incorrectly.
+  state.activeUserThemeId = theme.id;
+  setCustomizeNeedsSave(false);
+  state.customizePack = pack;
+  if (!saveCustomizePack(pack)) return false;
+  applyCustomizePack(pack);
+  try { localStorage.setItem(THEME_KEY, userThemeKey(theme.id)); } catch (_) {}
+  return true;
+}
+
+export function deleteUserTheme(id) {
+  const list = loadUserThemes();
+  const next = list.filter((t) => t.id !== id);
+  if (next.length === list.length) return false;
+  if (!saveUserThemes(next)) return false;
+  if (state.activeUserThemeId === id) {
+    state.activeUserThemeId = null;
+  }
+  document.dispatchEvent(new CustomEvent("locked-in:user-themes-changed"));
+  return true;
+}
+
+export function getActiveUserTheme() {
+  if (!state.activeUserThemeId) return null;
+  return findUserTheme(state.activeUserThemeId);
 }
 
 export function switchToPresetTheme() {
   const pack = state.customizePack || loadCustomizePack();
   pack.mode = "preset";
+  state.activeUserThemeId = null;
   // Keep icons; clear color overrides so preset tokens show through.
   Object.keys(pack.colors).forEach((k) => { pack.colors[k] = null; });
   pack.font.color = null;
@@ -385,6 +710,7 @@ export function switchToPresetTheme() {
   const stack = FONT_FAMILIES[pack.font.family] || FONT_FAMILIES.system;
   if (pack.font.family !== "system") document.documentElement.style.setProperty("--font", stack);
   else document.documentElement.style.removeProperty("--font");
+  setCustomizeNeedsSave(false);
   syncCustomizeForm(pack);
   document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
 }
@@ -392,14 +718,37 @@ export function switchToPresetTheme() {
 export function resetCustomizeToPreset() {
   const pack = defaultPack();
   pack.mode = "preset";
+  state.activeUserThemeId = null;
   state.customizePack = pack;
   saveCustomizePack(pack);
   clearCustomCssVars();
   applyNavIcons(pack.icons);
   document.documentElement.style.removeProperty("--font");
+  setCustomizeNeedsSave(false);
   syncCustomizeForm(pack);
   document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
   showToast("Back to the theme preset.");
+}
+
+function setSaveThemeFormOpen(open) {
+  if (!dom.customizeSaveThemeForm) return;
+  dom.customizeSaveThemeForm.hidden = !open;
+  if (open) {
+    const active = getActiveUserTheme();
+    if (dom.customizeThemeName) {
+      dom.customizeThemeName.value = active?.name || "";
+      dom.customizeThemeName.focus();
+      dom.customizeThemeName.select?.();
+    }
+  } else if (dom.customizeThemeName) {
+    dom.customizeThemeName.value = "";
+  }
+}
+
+function commitSaveThemeFromForm() {
+  const name = dom.customizeThemeName?.value || "";
+  const entry = saveCurrentLookAsTheme(name);
+  if (entry) setSaveThemeFormOpen(false);
 }
 
 function setRoleColor(role, hex) {
@@ -605,7 +954,7 @@ function syncIconPreviews(icons) {
   NAV_ICON_KEYS.forEach((key) => {
     const preview = document.querySelector(`[data-icon-preview="${key}"]`);
     if (!preview) return;
-    const svg = icons?.[key];
+    const svg = icons?.[key] || (key === "settings" ? DEFAULT_SETTINGS_NAV_ICON : null);
     if (svg) {
       preview.innerHTML = svg;
       preview.classList.add("has-icon");
@@ -631,6 +980,7 @@ export function syncCustomizeForm(pack = state.customizePack) {
   if (dom.customizeModeLabel) {
     dom.customizeModeLabel.textContent = p.mode === "custom" ? "Custom theme active" : "Using preset theme";
   }
+  syncCustomizeSaveReminder(state.customizeNeedsSave);
   setActiveColorRole(activeColorRole);
   syncIconPreviews(p.icons);
 }
@@ -708,6 +1058,7 @@ export async function handleIconUpload(key, file) {
 
 export function clearNavIcon(key) {
   if (!NAV_ICON_KEYS.includes(key)) return;
+  enterCustomMode();
   const pack = state.customizePack || loadCustomizePack();
   pack.icons[key] = null;
   saveCustomizePack(pack);
@@ -778,8 +1129,9 @@ function renderSuggestedThemes() {
 
 export function exportCustomizePack() {
   const pack = state.customizePack || loadCustomizePack();
-  download("locked-in-customize.json", JSON.stringify(pack, null, 2), "application/json");
-  showToast("Look file ready to save.");
+  download("locked-in-theme.json", JSON.stringify(pack, null, 2), "application/json");
+  setCustomizeNeedsSave(false);
+  showToast("Theme file ready to download.");
 }
 
 export async function importCustomizePack(file) {
@@ -806,10 +1158,14 @@ export async function importCustomizePack(file) {
       pack.icons[key] = clean;
     }
   });
+  pack.mode = "custom";
+  state.activeUserThemeId = null;
   state.customizePack = pack;
   if (!saveCustomizePack(pack)) return false;
+  try { localStorage.setItem(THEME_KEY, "custom"); } catch (_) {}
   applyCustomizePack(pack);
-  showToast("Look loaded.");
+  setCustomizeNeedsSave(false);
+  showToast("Theme imported.");
   return true;
 }
 
@@ -864,15 +1220,47 @@ export function bindCustomizeEvents() {
   dom.customizeResetBtn?.addEventListener("click", () => {
     resetCustomizeToPreset();
     let theme = "dark";
-    try { theme = localStorage.getItem(THEME_KEY) || "dark"; } catch (_) {}
+    try {
+      const saved = localStorage.getItem(THEME_KEY) || "dark";
+      theme = (parseUserThemeKey(saved) || saved === "custom") ? "dark" : saved;
+      if (!["dark", "light", "forest", "violet", "pink", "blue"].includes(theme)) theme = "dark";
+      localStorage.setItem(THEME_KEY, theme);
+    } catch (_) {}
     document.documentElement.dataset.theme = theme;
     // Re-read preset CSS vars after clearing overrides
     const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg || "#101310");
   });
+
+  dom.customizeSaveThemeBtn?.addEventListener("click", () => {
+    setSaveThemeFormOpen(true);
+  });
+  dom.customizeSaveThemeCancel?.addEventListener("click", () => {
+    setSaveThemeFormOpen(false);
+  });
+  dom.customizeSaveThemeConfirm?.addEventListener("click", () => {
+    commitSaveThemeFromForm();
+  });
+  dom.customizeThemeName?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitSaveThemeFromForm();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setSaveThemeFormOpen(false);
+      dom.customizeSaveThemeBtn?.focus();
+    }
+  });
 }
 
 export function initCustomize() {
   loadCustomizePack();
-  applyCustomizePack(state.customizePack);
+  if (state.activeUserThemeId) {
+    if (!applyUserTheme(state.activeUserThemeId)) {
+      state.activeUserThemeId = null;
+      applyCustomizePack(state.customizePack);
+    }
+  } else {
+    applyCustomizePack(state.customizePack);
+  }
 }

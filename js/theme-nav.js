@@ -1,19 +1,34 @@
-import { THEME_KEY } from "./constants.js?v=140";
-import { dom, state } from "./runtime.js?v=140";
-import { safeWrite } from "./storage.js?v=140";
-import { renderSetup } from "./setup.js?v=140";
-import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=140";
-import { closeDatePicker, renderHistory } from "./history.js?v=140";
-import { renderInsights } from "./insights.js?v=140";
-import { renderNotes } from "./notes.js?v=140";
-import { renderCustomize, switchToPresetTheme } from "./customize.js?v=140";
-import { renderTodos } from "./todos.js?v=140";
+import { THEME_KEY } from "./constants.js?v=187";
+import { dom, state } from "./runtime.js?v=187";
+import { safeWrite } from "./storage.js?v=187";
+import { renderSetup } from "./setup.js?v=187";
+import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=187";
+import { closeDatePicker, renderHistory } from "./history.js?v=187";
+import { renderInsights } from "./insights.js?v=187";
+import { renderNotes } from "./notes.js?v=187";
+import {
+  applyUserTheme,
+  deleteUserTheme,
+  findUserTheme,
+  getActiveUserTheme,
+  loadUserThemes,
+  parseUserThemeKey,
+  renderCustomize,
+  restoreCustomizeBeforeEdits,
+  saveCurrentLookAsTheme,
+  setCustomizeNeedsSave,
+  switchToPresetTheme
+} from "./customize.js?v=187";
+import { renderTodos } from "./todos.js?v=187";
+import { renderSettings } from "./settings.js?v=187";
 
 export const screenMap = {
   timer: "timer-screen", history: "history-screen", insights: "insights-screen", notes: "notes-screen",
-  todos: "todos-screen", customize: "customize-screen", report: "report-screen", setup: "setup-screen"
+  todos: "todos-screen", customize: "customize-screen", settings: "settings-screen",
+  report: "report-screen", setup: "setup-screen"
 };
 
+const PRESET_THEMES = ["dark", "light", "forest", "violet", "pink", "blue"];
 
 export function closeMenu() {
   dom.nav.classList.remove("is-open");
@@ -52,11 +67,12 @@ export function proceedNavigate(id, replace = false) {
   if (id === "notes-screen") renderNotes();
   if (id === "todos-screen") renderTodos();
   if (id === "customize-screen") renderCustomize();
+  if (id === "settings-screen") renderSettings();
   if (id === "timer-screen" && state.session) renderTimer();
   syncStickyNotesUi();
   syncFloatingTimer();
   if (id !== "timer-screen") safeWrite("locked_in_last_screen", id);
-  const title = { "setup-screen": "Locked-In — Focus Timer", "timer-screen": "Focus session · Locked-In", "report-screen": "Session report · Locked-In", "history-screen": "History · Locked-In", "insights-screen": "Insights · Locked-In", "notes-screen": "Notes · Locked-In", "todos-screen": "To-Do · Locked-In", "customize-screen": "Customize · Locked-In" }[id];
+  const title = { "setup-screen": "Locked-In — Focus Timer", "timer-screen": "Focus session · Locked-In", "report-screen": "Session report · Locked-In", "history-screen": "History · Locked-In", "insights-screen": "Insights · Locked-In", "notes-screen": "Notes · Locked-In", "todos-screen": "To-Do · Locked-In", "customize-screen": "Customize · Locked-In", "settings-screen": "Settings · Locked-In" }[id];
   document.title = title || "Locked-In";
   const heading = document.querySelector(`#${id} h1`);
   if (heading) {
@@ -65,6 +81,110 @@ export function proceedNavigate(id, replace = false) {
     catch (_) { heading.focus({ preventScroll: true }); }
   }
   window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+
+let leaveCustomizePending = null;
+
+function setPageBlurred(on) {
+  document.documentElement.classList.toggle("is-page-blurred", Boolean(on));
+}
+
+function closeLeaveCustomizeDialog() {
+  leaveCustomizePending = null;
+  setPageBlurred(false);
+  if (dom.leaveCustomizeDialog?.open) dom.leaveCustomizeDialog.close();
+}
+
+function openLeaveCustomizeDialog(pendingId, replace) {
+  if (!dom.leaveCustomizeDialog) {
+    proceedNavigate(pendingId, replace);
+    return;
+  }
+  if (dom.leaveCustomizeDialog.open || dom.confirmDialog?.open) return;
+  leaveCustomizePending = { id: pendingId, replace: Boolean(replace) };
+  const customizeUrl = `${location.pathname}${location.search}#customize`;
+  if (location.hash !== "#customize") history.replaceState(null, "", customizeUrl);
+  const active = getActiveUserTheme();
+  if (dom.leaveCustomizeThemeName) {
+    dom.leaveCustomizeThemeName.value = active?.name || "";
+  }
+  setPageBlurred(true);
+  if (typeof dom.leaveCustomizeDialog.showModal === "function") {
+    dom.leaveCustomizeDialog.showModal();
+  } else {
+    const name = window.prompt("Theme name (leave blank to discard and leave):", active?.name || "");
+    setPageBlurred(false);
+    if (name == null) {
+      leaveCustomizePending = null;
+      return;
+    }
+    if (String(name).trim()) {
+      if (!saveCurrentLookAsTheme(name)) {
+        leaveCustomizePending = null;
+        return;
+      }
+      renderUserThemesInPicker();
+      syncThemePicker(document.documentElement.dataset.theme || "dark");
+    } else {
+      setCustomizeNeedsSave(false);
+    }
+    const pending = leaveCustomizePending;
+    leaveCustomizePending = null;
+    if (pending) proceedNavigate(pending.id, pending.replace);
+  }
+  queueMicrotask(() => {
+    dom.leaveCustomizeThemeName?.focus();
+    dom.leaveCustomizeThemeName?.select?.();
+  });
+}
+
+export function bindLeaveCustomizeDialog() {
+  if (!dom.leaveCustomizeDialog) return;
+
+  const stay = () => {
+    closeLeaveCustomizeDialog();
+  };
+
+  const discardAndLeave = () => {
+    const pending = leaveCustomizePending;
+    restoreCustomizeBeforeEdits();
+    renderUserThemesInPicker();
+    syncThemePicker(document.documentElement.dataset.theme || "dark");
+    closeLeaveCustomizeDialog();
+    if (pending) proceedNavigate(pending.id, pending.replace);
+  };
+
+  const saveAndLeave = () => {
+    const pending = leaveCustomizePending;
+    const name = dom.leaveCustomizeThemeName?.value || "";
+    const entry = saveCurrentLookAsTheme(name);
+    if (!entry) {
+      dom.leaveCustomizeThemeName?.focus();
+      return;
+    }
+    renderUserThemesInPicker();
+    syncThemePicker(document.documentElement.dataset.theme || "dark");
+    closeLeaveCustomizeDialog();
+    if (pending) proceedNavigate(pending.id, pending.replace);
+  };
+
+  dom.leaveCustomizeStay?.addEventListener("click", stay);
+  dom.leaveCustomizeDiscard?.addEventListener("click", discardAndLeave);
+  dom.leaveCustomizeSave?.addEventListener("click", saveAndLeave);
+  dom.leaveCustomizeThemeName?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveAndLeave();
+    }
+  });
+  dom.leaveCustomizeDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    stay();
+  });
+  dom.leaveCustomizeDialog.addEventListener("close", () => {
+    setPageBlurred(false);
+    leaveCustomizePending = null;
+  });
 }
 
 export function navigate(id, replace = false) {
@@ -87,6 +207,14 @@ export function navigate(id, replace = false) {
     );
     return;
   }
+  if (
+    state.customizeNeedsSave
+    && state.activeScreen === "customize-screen"
+    && id !== "customize-screen"
+  ) {
+    openLeaveCustomizeDialog(id, replace);
+    return;
+  }
   proceedNavigate(id, replace);
 }
 
@@ -94,15 +222,143 @@ function isCustomThemeActive() {
   return state.customizePack?.mode === "custom";
 }
 
-/** Keep theme button + popover in sync with preset vs Custom mode. */
+function themePickerButtons() {
+  return [...(dom.themePopover?.querySelectorAll("[data-theme], [data-user-theme]") || [])];
+}
+
+function swatchColorForPack(pack) {
+  const accent = pack?.colors?.accent;
+  const bg = pack?.colors?.bg;
+  return accent || bg || "#b7f36b";
+}
+
+/** Render saved named themes under the built-in list. */
+export function renderUserThemesInPicker() {
+  const list = dom.userThemeList;
+  if (!list) return;
+  const themes = loadUserThemes();
+  list.replaceChildren();
+  if (!themes.length) {
+    list.hidden = true;
+    return;
+  }
+  list.hidden = false;
+  themes.forEach((theme) => {
+    const row = document.createElement("div");
+    row.className = "user-theme-row";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "user-theme-btn";
+    button.dataset.userTheme = theme.id;
+    button.setAttribute("role", "radio");
+    button.setAttribute("aria-checked", "false");
+    button.tabIndex = -1;
+
+    const swatch = document.createElement("span");
+    swatch.className = "swatch";
+    swatch.style.background = swatchColorForPack(theme.pack);
+    swatch.setAttribute("aria-hidden", "true");
+
+    const label = document.createElement("span");
+    label.className = "user-theme-name";
+    label.textContent = theme.name;
+
+    button.append(swatch, label);
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "user-theme-delete";
+    del.setAttribute("aria-label", `Delete theme ${theme.name}`);
+    del.title = `Delete “${theme.name}”`;
+    del.textContent = "×";
+    del.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      askConfirm(
+        "Delete theme?",
+        `Remove “${theme.name}” from your saved themes?`,
+        () => {
+          const wasActive = state.activeUserThemeId === theme.id;
+          if (!deleteUserTheme(theme.id)) return;
+          if (wasActive) setTheme("dark", true);
+          else {
+            renderUserThemesInPicker();
+            syncThemePicker(document.documentElement.dataset.theme || "dark");
+          }
+        },
+        "Delete"
+      );
+    });
+
+    button.addEventListener("click", () => {
+      selectUserTheme(theme.id);
+    });
+
+    row.append(button, del);
+    list.append(row);
+  });
+}
+
+function confirmDiscardCustomizeEdits(then) {
+  if (!state.customizeNeedsSave) {
+    then();
+    return;
+  }
+  if (dom.confirmDialog?.open) return;
+  askConfirm(
+    "Discard unsaved look?",
+    "You haven’t saved this look to My Themes. Switch themes anyway? These unsaved edits will be replaced.",
+    () => {
+      setCustomizeNeedsSave(false);
+      then();
+    },
+    "Switch"
+  );
+}
+
+export function selectUserTheme(id) {
+  confirmDiscardCustomizeEdits(() => {
+    if (!applyUserTheme(id)) {
+      renderUserThemesInPicker();
+      syncThemePicker(document.documentElement.dataset.theme || "dark");
+      return;
+    }
+    closeThemePopover();
+    renderUserThemesInPicker();
+    syncThemePicker(document.documentElement.dataset.theme || "dark");
+    if (state.activeScreen === "insights-screen") renderInsights();
+    if (state.activeScreen === "customize-screen") renderCustomize();
+    dom.themeButton?.focus();
+  });
+}
+
+/** Keep theme button + popover in sync with preset vs Custom vs named theme. */
 export function syncThemePicker(chosen = document.documentElement.dataset.theme || "dark") {
   const custom = isCustomThemeActive();
-  const label = custom ? "Custom" : chosen[0].toUpperCase() + chosen.slice(1);
+  const activeNamed = custom ? getActiveUserTheme() : null;
+  const label = activeNamed
+    ? activeNamed.name
+    : custom
+      ? "Custom"
+      : (PRESET_THEMES.includes(chosen) ? chosen[0].toUpperCase() + chosen.slice(1) : "Dark");
   dom.themeButton?.setAttribute("aria-label", `Theme: ${label}. Open theme picker`);
   const name = dom.themeButton?.querySelector(".theme-name");
   if (name) name.textContent = label;
+
   dom.themePopover?.querySelectorAll("[data-theme]").forEach((button) => {
-    const active = custom ? button.dataset.theme === "custom" : button.dataset.theme === chosen;
+    const active = activeNamed
+      ? false
+      : custom
+        ? button.dataset.theme === "custom"
+        : button.dataset.theme === chosen;
+    button.classList.toggle("is-selected", active);
+    button.setAttribute("aria-checked", String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
+
+  dom.themePopover?.querySelectorAll("[data-user-theme]").forEach((button) => {
+    const active = Boolean(activeNamed && button.dataset.userTheme === activeNamed.id);
     button.classList.toggle("is-selected", active);
     button.setAttribute("aria-checked", String(active));
     button.tabIndex = active ? 0 : -1;
@@ -120,17 +376,23 @@ export function setTheme(theme, persist = true) {
     syncThemePicker(document.documentElement.dataset.theme || "dark");
     return;
   }
-  const themes = ["dark", "light", "forest", "violet", "pink", "blue"];
-  const chosen = themes.includes(theme) ? theme : "dark";
-  document.documentElement.dataset.theme = chosen;
-  // Preset selection clears custom color overrides (icons are kept).
-  if (persist) switchToPresetTheme();
-  syncThemePicker(chosen);
-  if (persist) { try { localStorage.setItem(THEME_KEY, chosen); } catch (_) {} }
-  const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg || "#101310");
-  if (state.activeScreen === "insights-screen") renderInsights();
-  if (state.activeScreen === "customize-screen") renderCustomize();
+  const apply = () => {
+    const chosen = PRESET_THEMES.includes(theme) ? theme : "dark";
+    document.documentElement.dataset.theme = chosen;
+    // Preset selection clears custom color overrides (icons are kept).
+    if (persist) {
+      state.activeUserThemeId = null;
+      switchToPresetTheme();
+      try { localStorage.setItem(THEME_KEY, chosen); } catch (_) {}
+    }
+    syncThemePicker(chosen);
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg || "#101310");
+    if (state.activeScreen === "insights-screen") renderInsights();
+    if (state.activeScreen === "customize-screen") renderCustomize();
+  };
+  if (persist) confirmDiscardCustomizeEdits(apply);
+  else apply();
 }
 
 export function closeThemePopover() {
@@ -142,47 +404,93 @@ export function initTheme() {
   let saved = null;
   try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
   const system = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-  setTheme(saved || system, false);
+  const userId = parseUserThemeKey(saved);
+
+  if (userId) {
+    const theme = findUserTheme(userId);
+    if (theme) {
+      state.activeUserThemeId = userId;
+      // Keep FOUC/base preset on <html>; pack apply happens in initCustomize.
+      const base = PRESET_THEMES.includes(document.documentElement.dataset.theme)
+        ? document.documentElement.dataset.theme
+        : system;
+      document.documentElement.dataset.theme = base;
+    } else {
+      try { localStorage.setItem(THEME_KEY, system); } catch (_) {}
+      setTheme(system, false);
+    }
+  } else if (saved === "custom") {
+    // Unsaved custom — pack apply in initCustomize; keep base preset.
+    const base = PRESET_THEMES.includes(document.documentElement.dataset.theme)
+      ? document.documentElement.dataset.theme
+      : system;
+    document.documentElement.dataset.theme = base;
+  } else {
+    setTheme(saved || system, false);
+  }
+
+  renderUserThemesInPicker();
+  syncThemePicker(document.documentElement.dataset.theme || "dark");
+
   document.addEventListener("locked-in:customize-mode", () => {
     syncThemePicker(document.documentElement.dataset.theme || "dark");
   });
-  const themeButtons = [...dom.themePopover.querySelectorAll("[data-theme]")];
+  document.addEventListener("locked-in:user-themes-changed", () => {
+    renderUserThemesInPicker();
+    syncThemePicker(document.documentElement.dataset.theme || "dark");
+  });
+
   const syncThemeTabStops = () => {
-    themeButtons.forEach((button) => {
+    themePickerButtons().forEach((button) => {
       const selected = button.getAttribute("aria-checked") === "true";
       button.tabIndex = selected ? 0 : -1;
     });
   };
-  syncThemeTabStops();
+
   dom.themeButton.addEventListener("click", () => {
     const open = dom.themePopover.classList.toggle("is-open");
     dom.themeButton.setAttribute("aria-expanded", String(open));
     if (open) {
+      renderUserThemesInPicker();
+      syncThemePicker(document.documentElement.dataset.theme || "dark");
       syncThemeTabStops();
-      (themeButtons.find((b) => b.getAttribute("aria-checked") === "true") || themeButtons[0])?.focus();
+      const buttons = themePickerButtons();
+      (buttons.find((b) => b.getAttribute("aria-checked") === "true") || buttons[0])?.focus();
     }
   });
-  themeButtons.forEach((b) => b.addEventListener("click", () => {
-    if (b.dataset.theme === "custom") {
-      openCustomizeFromTheme();
-      return;
-    }
-    setTheme(b.dataset.theme);
-    closeThemePopover();
-    dom.themeButton.focus();
-  }));
+
+  // Built-in theme buttons (static).
+  dom.themePopover.querySelectorAll("[data-theme]").forEach((b) => {
+    b.addEventListener("click", () => {
+      if (b.dataset.theme === "custom") {
+        openCustomizeFromTheme();
+        return;
+      }
+      setTheme(b.dataset.theme);
+      closeThemePopover();
+      dom.themeButton.focus();
+    });
+  });
+
   dom.themePopover.addEventListener("keydown", (e) => {
     if (!dom.themePopover.classList.contains("is-open")) return;
-    const current = themeButtons.indexOf(document.activeElement);
+    const buttons = themePickerButtons();
+    const current = buttons.indexOf(document.activeElement);
     if (current < 0) return;
     let next = current;
-    if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); next = (current + 1) % themeButtons.length; }
-    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); next = (current - 1 + themeButtons.length) % themeButtons.length; }
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); next = (current + 1) % buttons.length; }
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); next = (current - 1 + buttons.length) % buttons.length; }
     else if (e.key === "Home") { e.preventDefault(); next = 0; }
-    else if (e.key === "End") { e.preventDefault(); next = themeButtons.length - 1; }
+    else if (e.key === "End") { e.preventDefault(); next = buttons.length - 1; }
     else if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
-      const theme = themeButtons[current].dataset.theme;
+      const btn = buttons[current];
+      const theme = btn.dataset.theme;
+      const userTheme = btn.dataset.userTheme;
+      if (userTheme) {
+        selectUserTheme(userTheme);
+        return;
+      }
       if (theme === "custom") openCustomizeFromTheme();
       else {
         setTheme(theme);
@@ -191,11 +499,14 @@ export function initTheme() {
       }
       return;
     } else return;
-    const nextTheme = themeButtons[next].dataset.theme;
-    // Preview presets while browsing; Custom only activates on Enter/click.
-    if (nextTheme !== "custom") setTheme(nextTheme);
+    const nextBtn = buttons[next];
+    const nextTheme = nextBtn.dataset.theme;
+    const nextUser = nextBtn.dataset.userTheme;
+    // Preview presets while browsing; Custom / named only activate on Enter/click.
+    if (nextTheme && nextTheme !== "custom") setTheme(nextTheme, false);
+    else if (nextUser) syncThemeTabStops();
     else syncThemeTabStops();
-    themeButtons[next].focus();
+    nextBtn.focus();
   });
   document.addEventListener("click", (e) => {
     if (!dom.themePopover.contains(e.target) && !dom.themeButton.contains(e.target)) closeThemePopover();

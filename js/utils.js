@@ -1,9 +1,21 @@
-import { DEFAULT_POMODORO_MINUTES, GOAL_LIMITS, POMODORO_MINUTE_OPTIONS } from "./constants.js?v=140";
-import { state } from "./runtime.js?v=140";
+import {
+  DEFAULT_POMODORO_MINUTES,
+  GOAL_LIMITS,
+  POMODORO_CUSTOM_MAX,
+  POMODORO_CUSTOM_MIN,
+  POMODORO_MINUTE_OPTIONS
+} from "./constants.js?v=187";
+import { state } from "./runtime.js?v=187";
 
 export function normalizePomodoroMinutes(value) {
   const mins = Math.floor(Number(value) || 0);
-  return POMODORO_MINUTE_OPTIONS.includes(mins) ? mins : DEFAULT_POMODORO_MINUTES;
+  if (POMODORO_MINUTE_OPTIONS.includes(mins)) return mins;
+  if (mins >= POMODORO_CUSTOM_MIN && mins <= POMODORO_CUSTOM_MAX) return mins;
+  return DEFAULT_POMODORO_MINUTES;
+}
+
+export function isPomodoroPresetMinutes(value) {
+  return POMODORO_MINUTE_OPTIONS.includes(Math.floor(Number(value) || 0));
 }
 
 export function clampGoalMinutes(kind, minutes) {
@@ -155,6 +167,23 @@ export function formatShortDate(iso) {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return "Any date";
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(d);
+}
+
+/** Theme-aware glow on filter controls while a non-default value is applied. */
+export function setFilterGlow(el, active) {
+  if (!el) return;
+  const on = Boolean(active);
+  const was = el.classList.contains("is-filter-active");
+  el.classList.toggle("is-filter-active", on);
+  if (!on) {
+    el.classList.remove("is-filter-pulse");
+    return;
+  }
+  if (was || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  el.classList.remove("is-filter-pulse");
+  void el.offsetWidth;
+  el.classList.add("is-filter-pulse");
+  window.setTimeout(() => el.classList.remove("is-filter-pulse"), 900);
 }
 
 export function csvEscape(value) {

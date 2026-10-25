@@ -1,0 +1,215 @@
+/* Settings screen — global preferences & device backup */
+
+.nav-link-settings {
+  justify-content: center;
+  min-width: 40px;
+  padding-inline: 11px;
+}
+
+.nav-link-settings .nav-icon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.nav-link-settings .nav-icon[hidden] {
+  display: none !important;
+}
+
+.nav-link-settings .nav-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.nav-link-settings .nav-link-label {
+  display: none;
+}
+
+#settings-screen .settings-hero {
+  margin-bottom: 22px;
+  max-width: 40rem;
+}
+
+#settings-screen .settings-hero h1 {
+  margin: 0 0 8px;
+  font-size: clamp(32px, 5vw, 48px);
+}
+
+#settings-screen .settings-hero > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.settings-stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+  max-width: none;
+  align-items: start;
+}
+
+.settings-panel {
+  margin: 0;
+  padding: 18px 20px 20px;
+  min-width: 0;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.settings-panel .panel-heading {
+  margin-bottom: 12px;
+}
+
+.settings-panel .panel-heading h2 {
+  margin: 0;
+  font-size: clamp(18px, 2.4vw, 22px);
+  color: var(--text);
+}
+
+.settings-panel .eyebrow {
+  color: var(--accent);
+}
+
+.settings-panel-copy,
+.settings-permission-status,
+.settings-panel .local-data-note,
+.settings-panel .prefs-hint {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.settings-permission-status {
+  font-weight: 650;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-prefs-group {
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.settings-prefs-group + .settings-prefs-group {
+  margin-top: 14px;
+}
+
+/* Keep toggles compact — never stretch to fill a tall panel */
+#settings-screen .prefs-toggle {
+  align-items: start;
+  height: auto;
+  min-height: 0;
+  align-self: start;
+}
+
+#settings-screen .prefs-group {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+#settings-screen .prefs-segment {
+  width: fit-content;
+  max-width: 100%;
+}
+
+
+.settings-about-copy {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  max-width: 42rem;
+}
+
+.settings-about-copy .settings-panel-copy {
+  margin: 0;
+}
+
+.settings-about-lead {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.settings-about-privacy {
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.settings-panel-danger {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+.settings-danger-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-danger-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.settings-danger-item .button {
+  width: 100%;
+  justify-content: center;
+}
+
+.settings-danger-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Span full width for primary / closing sections */
+.settings-panel-wide {
+  grid-column: 1 / -1;
+}
+
+.setup-open-settings-btn {
+  margin-top: 12px;
+}
+
+@media (max-width: 860px) {
+  .settings-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-panel-wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-panel {
+    padding: 16px;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .settings-actions .button {
+    width: 100%;
+  }
+
+  .settings-danger-actions {
+    grid-template-columns: 1fr;
+  }
+}

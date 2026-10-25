@@ -1,18 +1,31 @@
-import { ACTIVE_SESSION_KEY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=140";
-import { dom, state, tabId } from "./runtime.js?v=140";
-import { safeRead, safeWrite } from "./storage.js?v=140";
-import { showToast } from "./toast.js?v=140";
-import { formatShortDate, normalizePomodoroMinutes } from "./utils.js?v=140";
-import { initSync } from "./sync.js?v=140";
-import { askConfirm, closeMenu, closeThemePopover, initTheme, navigate, screenMap, toggleMenu } from "./theme-nav.js?v=140";
-import { bindCustomizeEvents, initCustomize } from "./customize.js?v=140";
-import { applyPrefsToDom, loadData, markFocusGoalsEdited, readGoalMinutesFromDom, renderFocusGoals, renderSetup, resetSetupFormDefaults, restoreFocusGoalsDefault, saveFocusGoalsFromDom, savePrefs, selectedChimeMode, setPrefsPanelOpen, syncChimeHint, syncGoalEditor, syncHardcoreHint, syncPomodoroIntervalVisibility, syncSetupWidgetVisibility, syncTagCustomVisibility } from "./setup.js?v=140";
-import { activeFocusSeconds, addStickyNote, closeEndSessionDialog, finishSession, requestNotificationPermission, requestWakeLock, restoreActiveSession, setStickyNotesOpen, setStickyState, startSession, startTimerLoop, stopSession, tick, toggleBreak } from "./session.js?v=140";
-import { addNoteToViewedSession, addReportNote, clearHistory, clearHistoryFilters, closeSessionNotesViewer, deleteSession, exportCsv, exportJson, importJson, initDatePickers, initHistoryTableScrollHint, openHistoryForDay, openNotesFilteredToSession, openSessionNotesViewer, renderHistory, saveEdit, saveReportNotes, syncHistoryTableScroll } from "./history.js?v=140";
-import { downloadWeekCard, renderInsights } from "./insights.js?v=140";
-import { addInboxNote, clearNotesSessionFilter, closeOpenNoteMenus, createNoteOptionsMenu, deleteEditedNote, renderNotes, saveEditedNote } from "./notes.js?v=140";
-import { bindTodoEvents, renderTodos } from "./todos.js?v=140";
-import { bindWeekReportEvents, renderWeekReports, resetWeekNow } from "./week-reports.js?v=140";
+import { ACTIVE_SESSION_KEY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=187";
+import { dom, state, tabId } from "./runtime.js?v=187";
+import { safeRead, safeWrite } from "./storage.js?v=187";
+import { showToast } from "./toast.js?v=187";
+import { formatShortDate } from "./utils.js?v=187";
+import { initSync } from "./sync.js?v=187";
+import { askConfirm, bindLeaveCustomizeDialog, closeMenu, closeThemePopover, initTheme, navigate, screenMap, toggleMenu } from "./theme-nav.js?v=187";
+import { bindCustomizeEvents, initCustomize } from "./customize.js?v=187";
+import {
+  applyPomodoroMinutesToDom, applyPrefsToDom, clearLinkedTodo, ensureBreakFitsFocus, fitBreakMinutesToFocus,
+  linkTodoToSetup, loadData, markFocusGoalsEdited, syncLinkedTodoFromIntentInput,
+  readGoalMinutesFromDom, readPomodoroMinutesFromDom, renderFocusGoals, renderSetup, resetSetupFormDefaults,
+  restoreFocusGoalsDefault, saveFocusGoalsFromDom, savePrefs, selectedChimeMode, setPrefsPanelOpen,
+  syncBreakFocusValidation, syncChimeHint, syncGoalEditor, syncGoalLimitHint, syncHardcoreHint,
+  syncPomodoroCustomVisibility, syncPomodoroIntervalVisibility, syncPomodoroMinuteOptions,
+  syncSetupWidgetVisibility, syncTagCustomVisibility
+} from "./setup.js?v=187";
+import { activeFocusSeconds, addStickyNote, closeEndSessionDialog, finishSession, requestNotificationPermission, requestWakeLock, restoreActiveSession, setStickyNotesOpen, setStickyState, startSession, startTimerLoop, stopSession, tick, toggleBreak } from "./session.js?v=187";
+import { addNoteToViewedSession, addReportNote, clearHistory, clearHistoryFilters, closeSessionNotesViewer, deleteSession, exportCsv, importJson, initDatePickers, initHistoryTableScrollHint, openHistoryForDay, openNotesFilteredToSession, openSessionNotesViewer, renderHistory, saveEdit, saveReportNotes, syncHistoryTableScroll } from "./history.js?v=187";
+import { downloadWeekCard, renderInsights } from "./insights.js?v=187";
+import {
+  clearNotesFilters, clearNotesSessionFilter, closeNoteGroupDialog, closeOpenNoteMenus, createNoteOptionsMenu,
+  deleteEditedNote, onNoteGroupSelectChange, onNotesScopeFilterChange, onNotesSessionPickChange, openNoteComposer,
+  openNotesDatePicker, promptNewNoteGroup, renderNotes, saveEditedNote, submitNoteGroupDialog
+} from "./notes.js?v=187";
+import { bindTodoEvents, renderTodos } from "./todos.js?v=187";
+import { bindWeekReportEvents, renderWeekReports, resetWeekNow } from "./week-reports.js?v=187";
+import { bindSettingsEvents, syncSettingsNotifyStatus } from "./settings.js?v=187";
 
 function confirmResetWeekNow() {
   askConfirm(
@@ -39,11 +52,13 @@ export function handleKeyboard(e) {
     if(dom.menuToggle.getAttribute("aria-expanded")==="true"){closeMenu();return;}
     if(dom.endSessionDialog?.open){closeEndSessionDialog();return;}
     if(dom.editDialog.open){dom.editDialog.close();return;}
+    if(dom.noteGroupDialog?.open){closeNoteGroupDialog({ cancelled: true });return;}
     if(dom.editNoteDialog?.open){dom.editNoteDialog.close();state.editingNote=null;return;}
+
     if(dom.confirmDialog.open){dom.confirmDialog.close("cancel");return;}
   }
   if(typing||e.altKey||e.ctrlKey||e.metaKey)return;
-  if(dom.endSessionDialog?.open||dom.confirmDialog.open)return;
+  if(dom.endSessionDialog?.open||dom.confirmDialog.open||dom.noteGroupDialog?.open)return;
   if(!state.session||state.readOnly||!dom.keyboardShortcuts.checked)return;
   if(e.key.toLowerCase()==="b"){e.preventDefault();toggleBreak();}
   if(e.key.toLowerCase()==="s"){e.preventDefault();stopSession();}
@@ -53,7 +68,40 @@ export function bindEvents() {
   dom.menuToggle.addEventListener("click",toggleMenu);
   dom.navLinks.forEach(link=>link.addEventListener("click",()=>navigate(link.dataset.screen)));
   dom.setupForm.addEventListener("submit",startSession);
-  dom.durationPreset.addEventListener("change",()=>{const custom=dom.durationPreset.value==="custom";dom.customDuration.classList.toggle("is-hidden",!custom);dom.customDuration.setAttribute("aria-hidden",String(!custom));if(custom)dom.customHours.focus();});
+  dom.setupTodoPick?.addEventListener("change", () => {
+    const id = dom.setupTodoPick.value;
+    if (!id) {
+      clearLinkedTodo();
+      return;
+    }
+    if (linkTodoToSetup(id)) {
+      showToast("To-do linked — its timer starts when you focus.");
+      dom.taskIntent?.focus();
+    } else {
+      showToast("That to-do is no longer open.");
+    }
+  });
+  dom.setupTodoUnlink?.addEventListener("click", () => {
+    clearLinkedTodo({ clearIntent: true });
+    dom.taskIntent?.focus();
+    showToast("To-do unlinked.");
+  });
+  dom.taskIntent?.addEventListener("input", syncLinkedTodoFromIntentInput);
+  const refreshBreakOptionsForFocus = () => {
+    ensureBreakFitsFocus({ persist: Boolean(state.prefs.pomodoro) });
+    syncPomodoroIntervalVisibility();
+  };
+  dom.durationPreset.addEventListener("change",()=>{
+    const custom=dom.durationPreset.value==="custom";
+    dom.customDuration.classList.toggle("is-hidden",!custom);
+    dom.customDuration.setAttribute("aria-hidden",String(!custom));
+    if(custom)dom.customHours.focus();
+    refreshBreakOptionsForFocus();
+  });
+  [dom.customHours, dom.customMinutes].filter(Boolean).forEach((el) => {
+    el.addEventListener("input", refreshBreakOptionsForFocus);
+    el.addEventListener("change", refreshBreakOptionsForFocus);
+  });
   dom.sessionStyle?.addEventListener("change", syncHardcoreHint);
   const returnToActiveTimer = () => {
     resetSetupFormDefaults();
@@ -92,7 +140,7 @@ export function bindEvents() {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); addStickyNote(false); }
   });
   dom.breakBtn.addEventListener("click",toggleBreak);dom.stopBtn.addEventListener("click",stopSession);
-  dom.newSessionBtn.addEventListener("click",()=>{dom.taskIntent.value="";navigate("setup-screen");dom.taskIntent.focus();});
+  dom.newSessionBtn.addEventListener("click",()=>{dom.taskIntent.value="";clearLinkedTodo();navigate("setup-screen");dom.taskIntent.focus();});
   dom.reportHistoryBtn.addEventListener("click",()=>navigate("history-screen"));dom.historyStartBtn.addEventListener("click",()=>navigate("setup-screen"));
   [dom.historySearch,dom.historySort,dom.historyTagFilter].filter(Boolean).forEach(el=>el.addEventListener("input",renderHistory));
   dom.clearHistoryFiltersBtn?.addEventListener("click", clearHistoryFilters);
@@ -152,10 +200,10 @@ export function bindEvents() {
     state.prefs[key] = true;
     syncNotifyCheckbox(key, true);
     if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
+    import("./settings.js?v=187").then(({ syncSettingsNotifyStatus }) => syncSettingsNotifyStatus()).catch(() => {});
   };
   dom.prefsToggleBtn?.addEventListener("click", () => {
     setPrefsPanelOpen(!state.prefs.panelOpen);
-    if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
   });
   dom.prefNotifyEnd?.addEventListener("change", () => {
     void persistPrefToggle("notifyEnd", dom.prefNotifyEnd.checked, true);
@@ -164,20 +212,61 @@ export function bindEvents() {
     void persistPrefToggle("notifyBreak", dom.prefNotifyBreak.checked, true);
   });
   dom.prefPomodoro?.addEventListener("change", () => {
-    state.prefs.pomodoro = dom.prefPomodoro.checked;
+    state.prefs.pomodoro = dom.prefPomodoro.checked === true;
+    if (state.prefs.pomodoro) {
+      state.prefs.pomodoroMinutes = fitBreakMinutesToFocus(state.prefs.pomodoroMinutes);
+      applyPomodoroMinutesToDom(state.prefs.pomodoroMinutes);
+    }
     syncPomodoroIntervalVisibility();
     if (state.prefs.pomodoro && dom.prefPomodoroMinutes) {
-      state.prefs.pomodoroMinutes = normalizePomodoroMinutes(dom.prefPomodoroMinutes.value);
-      dom.prefPomodoroMinutes.focus();
+      if (!syncBreakFocusValidation()) {
+        showToast("Break reminder must be shorter than your focus time.");
+        dom.prefPomodoroMinutes.focus();
+      } else {
+        dom.prefPomodoroMinutes.focus();
+      }
     }
     if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
   });
   dom.prefPomodoroMinutes?.addEventListener("change", () => {
-    state.prefs.pomodoroMinutes = normalizePomodoroMinutes(dom.prefPomodoroMinutes.value);
-    if (dom.prefPomodoroMinutes) dom.prefPomodoroMinutes.value = String(state.prefs.pomodoroMinutes);
+    const isCustom = dom.prefPomodoroMinutes.value === "custom";
+    syncPomodoroCustomVisibility(isCustom);
+    if (isCustom) {
+      if (dom.prefPomodoroCustomMinutes && !String(dom.prefPomodoroCustomMinutes.value || "").trim()) {
+        dom.prefPomodoroCustomMinutes.value = String(state.prefs.pomodoroMinutes || 30);
+      }
+      syncBreakFocusValidation();
+      dom.prefPomodoroCustomMinutes?.focus();
+      dom.prefPomodoroCustomMinutes?.select?.();
+      return;
+    }
+    if (!syncBreakFocusValidation()) {
+      showToast("Break reminder must be shorter than your focus time.");
+      applyPomodoroMinutesToDom(state.prefs.pomodoroMinutes);
+      return;
+    }
+    state.prefs.pomodoroMinutes = readPomodoroMinutesFromDom();
+    applyPomodoroMinutesToDom(state.prefs.pomodoroMinutes);
     state.pomodoroNotifiedBucket = -1;
     if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
   });
+  const commitPomodoroCustom = () => {
+    if (dom.prefPomodoroMinutes?.value !== "custom") return;
+    const typed = readPomodoroMinutesFromDom();
+    if (!syncBreakFocusValidation()) {
+      showToast("Custom break time must be shorter than your focus time.");
+      if (dom.prefPomodoroCustomMinutes) dom.prefPomodoroCustomMinutes.value = String(typed);
+      syncBreakFocusValidation();
+      return;
+    }
+    state.prefs.pomodoroMinutes = typed;
+    applyPomodoroMinutesToDom(state.prefs.pomodoroMinutes);
+    state.pomodoroNotifiedBucket = -1;
+    if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
+  };
+  dom.prefPomodoroCustomMinutes?.addEventListener("input", syncBreakFocusValidation);
+  dom.prefPomodoroCustomMinutes?.addEventListener("change", commitPomodoroCustom);
+  dom.prefPomodoroCustomMinutes?.addEventListener("blur", commitPomodoroCustom);
   dom.prefShowSetupGoal?.addEventListener("change", () => {
     state.prefs.showSetupGoal = dom.prefShowSetupGoal.checked;
     syncSetupWidgetVisibility();
@@ -229,19 +318,26 @@ export function bindEvents() {
       syncGoalEditor(kind, Number(slider.value));
       markFocusGoalsEdited();
     };
-    const onFields = () => {
-      syncGoalEditor(kind, readGoalMinutesFromDom(kind));
+    const onFieldsInput = () => {
+      // Keep typed digits intact; only move the slider preview + show limit hint.
       markFocusGoalsEdited();
+      syncGoalLimitHint(kind);
+    };
+    const onFieldsCommit = () => {
+      syncGoalEditor(kind, readGoalMinutesFromDom(kind, { commit: true }));
+      markFocusGoalsEdited();
+      syncGoalLimitHint(kind);
     };
     slider?.addEventListener("input", onSlider);
-    hours?.addEventListener("input", onFields);
-    mins?.addEventListener("input", onFields);
-    hours?.addEventListener("change", onFields);
-    mins?.addEventListener("change", onFields);
+    hours?.addEventListener("input", onFieldsInput);
+    mins?.addEventListener("input", onFieldsInput);
+    hours?.addEventListener("change", onFieldsCommit);
+    mins?.addEventListener("change", onFieldsCommit);
+    hours?.addEventListener("blur", onFieldsCommit);
+    mins?.addEventListener("blur", onFieldsCommit);
   };
   bindGoalEditor("daily");
   bindGoalEditor("weekly");
-  dom.goalWeekStartsOn?.addEventListener("change", markFocusGoalsEdited);
   dom.resetWeekNowBtn?.addEventListener("click", confirmResetWeekNow);
   dom.saveFocusGoalsBtn?.addEventListener("click", saveFocusGoalsFromDom);
   bindWeekReportEvents();
@@ -261,9 +357,7 @@ export function bindEvents() {
   if (dom.historyActions && !dom.historyActions.childElementCount) {
     const menu = createNoteOptionsMenu([
       { label: "Download spreadsheet", onClick: exportCsv },
-      { label: "Save backup", onClick: exportJson },
-      { label: "Restore backup", onClick: () => dom.importJsonInput?.click() },
-      { label: "Clear all history", danger: true, onClick: clearHistory }
+      { label: "Delete session history", danger: true, onClick: clearHistory }
     ]);
     const toggle = menu.querySelector(".note-options-toggle");
     if (toggle) {
@@ -285,7 +379,25 @@ export function bindEvents() {
   });
   dom.reportAddNoteBtn?.addEventListener("click", addReportNote);
   document.querySelector("#report-save-btn").addEventListener("click",saveReportNotes);
-  dom.noteCaptureForm.addEventListener("submit",e=>{e.preventDefault();addInboxNote();});dom.notesSearch.addEventListener("input",renderNotes);
+  dom.notesNewBtn?.addEventListener("click", () => openNoteComposer());
+  dom.notesNewGroupBtn?.addEventListener("click", () => promptNewNoteGroup());
+  dom.notesSearch?.addEventListener("input", renderNotes);
+  dom.notesScopeFilter?.addEventListener("change", onNotesScopeFilterChange);
+  dom.notesGroupFilter?.addEventListener("change", renderNotes);
+  dom.notesSessionPick?.addEventListener("change", onNotesSessionPickChange);
+  dom.notesDateFromBtn?.addEventListener("click", () => openNotesDatePicker("from"));
+  dom.notesDateToBtn?.addEventListener("click", () => openNotesDatePicker("to"));
+  dom.notesClearFiltersBtn?.addEventListener("click", clearNotesFilters);
+  dom.editNoteGroup?.addEventListener("change", onNoteGroupSelectChange);
+  dom.noteGroupCancel?.addEventListener("click", () => closeNoteGroupDialog({ cancelled: true }));
+  dom.noteGroupForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    submitNoteGroupDialog();
+  });
+  dom.noteGroupDialog?.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    closeNoteGroupDialog({ cancelled: true });
+  });
   dom.endSessionCancel?.addEventListener("click", () => closeEndSessionDialog());
   dom.endSessionDiscard?.addEventListener("click", () => {
     closeEndSessionDialog();
@@ -330,6 +442,12 @@ export function bindEvents() {
   dom.editNoteCancel?.addEventListener("click",()=>{state.editingNote=null;dom.editNoteDialog.close();});
   dom.editNoteDelete?.addEventListener("click",deleteEditedNote);
   dom.editNoteForm?.addEventListener("submit",(e)=>{e.preventDefault();saveEditedNote();});
+  dom.editNoteForm?.addEventListener("keydown",(e)=>{
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      saveEditedNote();
+    }
+  });
   document.addEventListener("keydown",handleKeyboard);
   window.addEventListener("popstate",()=>navigate(screenMap[location.hash.slice(1)]||"setup-screen",true));
   window.addEventListener("hashchange",()=>navigate(screenMap[location.hash.slice(1)]||"setup-screen",true));
@@ -344,13 +462,14 @@ export function bindEvents() {
 }
 
 export function init() {
-  loadData();initTheme();initCustomize();applyPrefsToDom();syncTagCustomVisibility();bindEvents();bindCustomizeEvents();bindTodoEvents();initSync();
+  loadData();initTheme();initCustomize();applyPrefsToDom();syncSettingsNotifyStatus();syncTagCustomVisibility();bindEvents();bindCustomizeEvents();bindLeaveCustomizeDialog();bindSettingsEvents();bindTodoEvents();initSync();
   try{dom.keyboardShortcuts.checked=localStorage.getItem("locked_in_keyboard_shortcuts")!=="false";}catch(_){}
   dom.keyboardShortcuts.addEventListener("change",()=>{try{localStorage.setItem("locked_in_keyboard_shortcuts",String(dom.keyboardShortcuts.checked));}catch(_){}});
   dom.currentYear.textContent=new Date().getFullYear();
   const initial=screenMap[location.hash.slice(1)]||"setup-screen";
   navigate(initial,true);
-  renderAll();
+  // Avoid renderAll() on boot — navigate already paints the active screen.
+  // Cross-tab sync still calls renderAll() when data changes.
   restoreActiveSession();
   try{localStorage.setItem("locked_in_app_version","3.1.1");}catch(_){}
 }

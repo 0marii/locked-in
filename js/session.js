@@ -1,13 +1,18 @@
-import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=140";
-import { dom, state, tabId } from "./runtime.js?v=140";
-import { safeRead, safeWrite } from "./storage.js?v=140";
-import { showToast } from "./toast.js?v=140";
-import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=140";
-import { broadcast } from "./sync.js?v=140";
-import { navigate } from "./theme-nav.js?v=140";
-import { currentTagValue, pomodoroIntervalSeconds, rememberRecentGoal, renderRecentGoals, resetSetupFormDefaults } from "./setup.js?v=140";
-import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=140";
-import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=140";
+import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=187";
+import { dom, state, tabId } from "./runtime.js?v=187";
+import { safeRead, safeWrite } from "./storage.js?v=187";
+import { showToast } from "./toast.js?v=187";
+import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=187";
+import { broadcast } from "./sync.js?v=187";
+import { navigate } from "./theme-nav.js?v=187";
+import {
+  breakIntervalFitsFocus, currentTagValue, pomodoroIntervalSeconds, readPomodoroMinutesFromDom,
+  rememberRecentGoal, renderRecentGoals, resetSetupFormDefaults,
+  syncBreakFocusValidation, syncPomodoroIntervalVisibility, syncPomodoroMinuteOptions
+} from "./setup.js?v=187";
+import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=187";
+import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, formatNotePlainText, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=187";
+import { pauseTaskTimer, startTaskTimer } from "./todos.js?v=187";
 
 export function normalizeRecord(record) {
   if (!record || typeof record !== "object") return null;
@@ -41,11 +46,17 @@ export function normalizeRecord(record) {
     reason: String(record.reason || "").slice(0, 300),
     topic, topics: topic, notes, studied: notes,
     noteItems: Array.isArray(record.noteItems)
-      ? record.noteItems.map((n) => ({
-          id: String(n?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
-          text: String(n?.text || "").trim().slice(0, 2000),
-          createdAt: n?.createdAt || new Date().toISOString()
-        })).filter((n) => n.text).slice(0, 100)
+      ? record.noteItems.map((n) => {
+          const title = String(n?.title || "").trim().slice(0, 120);
+          const text = String(n?.text || "").trim().slice(0, 2000);
+          if (!title && !text) return null;
+          return {
+            id: String(n?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+            title,
+            text,
+            createdAt: n?.createdAt || new Date().toISOString()
+          };
+        }).filter(Boolean).slice(0, 100)
       : undefined,
     score: record.score == null ? null : Math.max(0, Math.min(100, Math.floor(Number(record.score) || 0))),
     scoreVersion: 2,
@@ -159,14 +170,34 @@ export function startSession(event) {
   }
   const targetSeconds = parseDuration();
   if (!targetSeconds) return;
+  const suggestBreaks = Boolean(dom.prefPomodoro?.checked || state.prefs.pomodoro);
+  if (suggestBreaks) {
+    const focusMin = Math.floor(targetSeconds / 60);
+    syncPomodoroMinuteOptions();
+    const breakMin = readPomodoroMinutesFromDom();
+    if (!breakIntervalFitsFocus(breakMin, focusMin) || !syncBreakFocusValidation()) {
+      showToast(
+        dom.prefPomodoroMinutes?.value === "custom"
+          ? `Custom break time (${breakMin}m) must be under focus time (${focusMin}m).`
+          : `Break reminder (${breakMin}m) must be under focus time (${focusMin}m).`
+      );
+      import("./settings.js?v=187").then(({ openSettingsForBreaks }) => openSettingsForBreaks());
+      return;
+    }
+    state.prefs.pomodoro = true;
+    state.prefs.pomodoroMinutes = breakMin;
+  }
   const now = Date.now();
+  const linkedTodoId = state.linkedTodoTaskId || null;
   state.session = {
     id: `${now}-${Math.random().toString(36).slice(2, 9)}`, tabId, intent: intent.slice(0,120),
     targetSeconds, hardcore: dom.sessionStyle.value === "hardcore", startedAt: now,
     activeWorkStartedAt: now, accumulatedFocusSeconds: 0, currentBreakStartedAt: null,
-    breakSeconds: 0, breaks: [], topic: "", notes: "", noteItems: [], tag
+    breakSeconds: 0, breaks: [], topic: "", notes: "", noteItems: [], tag,
+    todoTaskId: linkedTodoId
   };
   if (!safeWrite(ACTIVE_SESSION_KEY, state.session)) { state.session = null; return; }
+  if (linkedTodoId) startTaskTimer(linkedTodoId, { render: false });
   rememberRecentGoal({
     intent: intent.slice(0, 120),
     durationPreset: dom.durationPreset.value,
@@ -256,8 +287,17 @@ export function renderStickyNoteList() {
   items.forEach((item, index) => {
     const li = document.createElement("li");
     li.className = "sticky-note-item";
-    const text = document.createElement("p");
-    text.textContent = item.text;
+    if (item.title) {
+      const title = document.createElement("strong");
+      title.className = "note-card-title";
+      title.textContent = item.title;
+      li.append(title);
+    }
+    if (item.text) {
+      const text = document.createElement("p");
+      text.textContent = item.text;
+      li.append(text);
+    }
     const meta = document.createElement("div");
     meta.className = "sticky-note-item-meta";
     const time = document.createElement("small");
@@ -265,16 +305,18 @@ export function renderStickyNoteList() {
     const actions = document.createElement("div");
     actions.className = "note-card-actions";
     const session = state.session;
+    const plain = formatNotePlainText(item);
     actions.append(createNoteItemOptions({
-      text: item.text,
-      label: `${session?.intent || "session"}-${index + 1}`,
+      text: plain,
+      label: item.title || `${session?.intent || "session"}-${index + 1}`,
       onEdit: () => openNoteEditor({
         scope: "live",
         sessionId: session.id,
         noteId: item.id,
         intent: session.intent,
         live: true,
-        text: item.text
+        title: item.title || "",
+        text: item.text || ""
       }),
       onDelete: () => {
         state.editingNote = {
@@ -283,13 +325,14 @@ export function renderStickyNoteList() {
           noteId: item.id,
           intent: session.intent,
           live: true,
-          text: item.text
+          title: item.title || "",
+          text: item.text || ""
         };
         deleteEditedNote();
       }
     }));
     meta.append(time, actions);
-    li.append(text, meta);
+    li.append(meta);
     dom.stickyNotesList.append(li);
   });
 }
@@ -305,6 +348,7 @@ export function addStickyNote(silent = false) {
   const items = ensureNoteItems(state.session);
   items.push({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: "",
     text,
     createdAt: new Date().toISOString()
   });
@@ -531,6 +575,12 @@ export function closeEndSessionDialog() {
   if (dom.endSessionDialog?.open) dom.endSessionDialog.close();
 }
 
+function pauseLinkedTodoFromSession(session) {
+  const todoId = session?.todoTaskId;
+  if (!todoId) return;
+  pauseTaskTimer(todoId, { render: false });
+}
+
 export function finishSession(outcome, reason, discard) {
   const s = state.session; if (!s) return;
   const now = Date.now();
@@ -545,6 +595,7 @@ export function finishSession(outcome, reason, discard) {
   // Only discard when the caller asked to discard (e.g. short-session Discard).
   // Explicit "Save as incomplete" must persist even under one minute of focus.
   if (discard) {
+    pauseLinkedTodoFromSession(s);
     clearBreakReminder();
     stopTimerLoop(); releaseWakeLock(); state.session = null; safeWrite(ACTIVE_SESSION_KEY, null); broadcast({type:"active-session", source:tabId, sessionId:null});
     resetStickyNotes();
@@ -573,6 +624,7 @@ export function finishSession(outcome, reason, discard) {
     hardcore:s.hardcore, hardcoreFailed:finalOutcome === "failed", outcome:finalOutcome, reason, topic:s.topic, notes:s.notes, noteItems,
     tag: s.tag || ""
   });
+  pauseLinkedTodoFromSession(s);
   clearBreakReminder();
   stopTimerLoop(); releaseWakeLock(); state.session = null; safeWrite(ACTIVE_SESSION_KEY, null); broadcast({type:"active-session", source:tabId, sessionId:null});
   resetStickyNotes();

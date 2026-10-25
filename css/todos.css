@@ -431,6 +431,36 @@
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
 }
 
+.todo-chip-working {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.todo-chip-timer {
+  cursor: pointer;
+  background: transparent;
+  font: inherit;
+  color: var(--text-muted);
+}
+
+.todo-chip-timer:hover,
+.todo-chip-timer:focus-visible {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  outline: none;
+}
+
+.todo-chip-timer.is-running {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.todo-task.is-timing {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+}
+
 .todo-task-actions {
   display: inline-flex;
   flex-wrap: nowrap;
@@ -470,17 +500,84 @@
   color: var(--danger);
 }
 
-.todo-priority-btn.is-low .todo-action-value {
+.todo-priority-field {
+  /* Shares .todo-action-btn shell with Due so both look identical */
+  position: relative;
+  gap: 5px;
+  padding-right: 8px;
+  cursor: pointer;
+}
+
+.todo-priority-field.is-low .todo-priority-select {
   color: var(--text-subtle);
 }
 
-.todo-priority-btn.is-high {
+.todo-priority-field.is-high {
   border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
   background: color-mix(in srgb, var(--warning) 12%, var(--surface));
 }
 
-.todo-priority-btn.is-high .todo-action-value {
+.todo-priority-field.is-high .todo-priority-select {
   color: var(--warning);
+}
+
+.todo-priority-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  display: block;
+  width: auto;
+  min-width: 2.6rem;
+  max-width: 4.5rem;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+  background-image: none !important;
+  color: inherit;
+  font: 700 11px var(--font);
+  line-height: 1.2;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.todo-priority-select:focus,
+.todo-priority-select:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+.todo-priority-select option {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.todo-priority-field .todo-action-caret {
+  pointer-events: none;
+}
+
+.todo-priority-select:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.todo-priority-field:has(.todo-priority-select:disabled) {
+  opacity: 0.55;
+  cursor: default;
+  border-style: solid;
+  pointer-events: none;
+}
+
+.todo-priority-field:has(.todo-priority-select:disabled):hover {
+  border-color: color-mix(in srgb, var(--text) 22%, var(--border));
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
 }
 
 .todo-action-btn:disabled {
@@ -660,6 +757,22 @@
   gap: 12px;
 }
 
+#setup-todos-open-btn {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 4px 0;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+#setup-todos-open-btn:hover,
+#setup-todos-open-btn:focus-visible {
+  color: var(--accent-strong, var(--accent));
+  outline: none;
+}
+
 .setup-todos-top .eyebrow {
   margin: 0 0 6px;
 }
@@ -768,8 +881,8 @@
 
 .setup-todos-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px;
   align-items: center;
   margin: 0;
   padding: 4px 6px 4px 8px;
@@ -806,7 +919,7 @@
   outline: none;
 }
 
-.setup-todos-row-open {
+.setup-todos-row-focus {
   display: block;
   width: 100%;
   margin: 0;
@@ -820,9 +933,37 @@
   cursor: pointer;
 }
 
+.setup-todos-row-focus:hover,
+.setup-todos-row-focus:focus-visible {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  outline: none;
+}
+
+.setup-todos-row-focus:hover .setup-todos-row-copy strong,
+.setup-todos-row-focus:focus-visible .setup-todos-row-copy strong {
+  color: var(--accent);
+}
+
+.setup-todos-row-open {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .setup-todos-row-open:hover,
 .setup-todos-row-open:focus-visible {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text);
   outline: none;
 }
 

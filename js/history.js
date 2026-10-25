@@ -1,15 +1,29 @@
-import { HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES } from "./constants.js?v=140";
-import { dom, state, tabId } from "./runtime.js?v=140";
-import { safeWrite } from "./storage.js?v=140";
-import { showToast } from "./toast.js?v=140";
-import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, toISODateLocal } from "./utils.js?v=140";
-import { broadcast } from "./sync.js?v=140";
-import { askConfirm, navigate } from "./theme-nav.js?v=140";
-import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=140";
-import { renderInsights } from "./insights.js?v=140";
-import { applyNoteItems, createNoteItemOptions, createNoteOptionsMenu, deleteEditedNote, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, sessionNoteItems } from "./notes.js?v=140";
-import { normalizeTodosDoc, saveTodos } from "./todos.js?v=140";
-import { renderAll } from "./bind.js?v=140";
+import {
+  CUSTOMIZE_KEY, FOCUS_GOALS_KEY, HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES, MAX_NOTE_GROUPS, MAX_WEEK_REPORTS,
+  PREFS_KEY, RECENT_GOALS_KEY, THEME_KEY, WEEK_REPORTS_KEY
+} from "./constants.js?v=187";
+import { dom, state, tabId } from "./runtime.js?v=187";
+import { safeRead, safeWrite } from "./storage.js?v=187";
+import { showToast } from "./toast.js?v=187";
+import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, setFilterGlow, toISODateLocal } from "./utils.js?v=187";
+import { broadcast } from "./sync.js?v=187";
+import { askConfirm, navigate, setTheme } from "./theme-nav.js?v=187";
+import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=187";
+import { renderInsights } from "./insights.js?v=187";
+import { applyNoteItems, createNoteItemOptions, createNoteOptionsMenu, deleteEditedNote, formatNotePlainText, normalizeNoteFields, normalizeNoteGroup, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, saveNoteGroups, sessionNoteItems } from "./notes.js?v=187";
+import { normalizeTodosDoc, saveTodos } from "./todos.js?v=187";
+import { applyPrefsToDom, loadFocusGoals, loadPrefs, loadRecentGoals, savePrefs } from "./setup.js?v=187";
+import { loadWeekReports, saveWeekReports } from "./week-reports.js?v=187";
+import {
+  applyCustomizePack,
+  applyUserTheme,
+  loadCustomizePack,
+  loadUserThemes,
+  parseUserThemeKey,
+  saveCustomizePack,
+  saveUserThemes
+} from "./customize.js?v=187";
+import { renderAll } from "./bind.js?v=187";
 
 export function liveSessionAsHistoryRow(now = Date.now()) {
   const s = state.session;
@@ -500,8 +514,22 @@ export function syncLiveHistoryRow(now = Date.now()) {
   }
 }
 
+function syncHistoryFilterGlows() {
+  const q = Boolean(dom.historySearch?.value?.trim());
+  const from = Boolean(dom.historyDateFrom?.value);
+  const to = Boolean(dom.historyDateTo?.value);
+  const sort = String(dom.historySort?.value || "newest");
+  const tag = Boolean(String(dom.historyTagFilter?.value || "").trim());
+  setFilterGlow(dom.historySearch?.closest(".search-field"), q);
+  setFilterGlow(dom.historyDateFromBtn?.closest(".compact-field"), from);
+  setFilterGlow(dom.historyDateToBtn?.closest(".compact-field"), to);
+  setFilterGlow(dom.historySort?.closest(".compact-field"), sort !== "newest");
+  setFilterGlow(dom.historyTagFilter?.closest(".compact-field"), tag);
+}
+
 export function renderHistory() {
   populateHistoryTagFilter();
+  syncHistoryFilterGlows();
   const rows = getFilteredHistory();
   dom.historyTableBody.replaceChildren();
   rows.forEach((r) => {
@@ -637,7 +665,7 @@ export function renderHistory() {
       notesChip.type = "button";
       notesChip.className = "history-chip history-chip-notes";
       notesChip.textContent = noteItems.length === 1 ? "1 note" : `${noteItems.length} notes`;
-      notesChip.title = noteItems.map((n, i) => `Note ${i + 1}: ${n.text}`).join("\n\n");
+      notesChip.title = noteItems.map((n, i) => `Note ${i + 1}: ${formatNotePlainText(n)}`).join("\n\n");
       notesChip.setAttribute(
         "aria-label",
         `${noteItems.length} note${noteItems.length === 1 ? "" : "s"} for ${r.intent}. Open notes.`
@@ -745,25 +773,29 @@ export function renderReportNotesList() {
     const li = document.createElement("li");
     li.className = "session-note-item";
     const label = document.createElement("strong");
-    label.textContent = `Note ${index + 1}`;
+    label.className = "note-card-title";
+    label.textContent = note.title || `Note ${index + 1}`;
     const p = document.createElement("p");
-    p.textContent = note.text;
+    p.className = "note-card-body";
+    p.textContent = note.text || "";
     const foot = document.createElement("div");
     foot.className = "session-note-item-foot";
     const time = document.createElement("small");
     time.textContent = formatDate(note.createdAt);
     const actions = document.createElement("div");
     actions.className = "note-card-actions";
+    const plain = formatNotePlainText(note);
     actions.append(createNoteItemOptions({
-      text: note.text,
-      label: `${item.intent || "note"}-${index + 1}`,
+      text: plain,
+      label: note.title || `${item.intent || "note"}-${index + 1}`,
       onEdit: () => openNoteEditor({
         scope: "history",
         sessionId: item.id,
         noteId: note.id,
         intent: item.intent,
         live: false,
-        text: note.text
+        title: note.title || "",
+        text: note.text || ""
       }),
       onDelete: () => {
         state.editingNote = {
@@ -772,7 +804,8 @@ export function renderReportNotesList() {
           noteId: note.id,
           intent: item.intent,
           live: false,
-          text: note.text
+          title: note.title || "",
+          text: note.text || ""
         };
         deleteEditedNote();
       }
@@ -796,8 +829,8 @@ export function addReportNote() {
   const previous = sessionNoteItems(item);
   const next = [
     ...previous,
-    { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, text, createdAt: new Date().toISOString() }
-  ];
+    normalizeNoteFields({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, title: "", text, createdAt: new Date().toISOString() })
+  ].filter(Boolean);
   applyNoteItems(item, next);
   if (!saveHistory()) {
     applyNoteItems(item, previous);
@@ -848,6 +881,19 @@ export function openNotesFilteredToSession(sessionId) {
     intent: source.intent || "Session"
   };
   if (dom.notesSearch) dom.notesSearch.value = "";
+  if (dom.notesScopeFilter) dom.notesScopeFilter.value = "sessions";
+  if (dom.notesGroupFilter) dom.notesGroupFilter.value = "all";
+  if (dom.notesSessionPick) {
+    // Ensure the option exists before selecting.
+    const has = Array.from(dom.notesSessionPick.options).some((o) => o.value === sessionId);
+    if (!has) {
+      const opt = document.createElement("option");
+      opt.value = sessionId;
+      opt.textContent = `${source.intent || "Session"}`;
+      dom.notesSessionPick.append(opt);
+    }
+    dom.notesSessionPick.value = sessionId;
+  }
   closeSessionNotesViewer();
   if (dom.editDialog?.open) {
     state.editingId = null;
@@ -897,25 +943,29 @@ export function renderSessionNotesViewer() {
     const li = document.createElement("li");
     li.className = "session-note-item";
     const label = document.createElement("strong");
-    label.textContent = `Note ${index + 1}`;
+    label.className = "note-card-title";
+    label.textContent = note.title || `Note ${index + 1}`;
     const p = document.createElement("p");
-    p.textContent = note.text;
+    p.className = "note-card-body";
+    p.textContent = note.text || "";
     const foot = document.createElement("div");
     foot.className = "session-note-item-foot";
     const time = document.createElement("small");
     time.textContent = formatDate(note.createdAt);
     const actions = document.createElement("div");
     actions.className = "note-card-actions";
+    const plain = formatNotePlainText(note);
     actions.append(createNoteItemOptions({
-      text: note.text,
-      label: `${item.intent || "note"}-${index + 1}`,
+      text: plain,
+      label: note.title || `${item.intent || "note"}-${index + 1}`,
       onEdit: () => openNoteEditor({
         scope: "history",
         sessionId: item.id,
         noteId: note.id,
         intent: item.intent,
         live: false,
-        text: note.text
+        title: note.title || "",
+        text: note.text || ""
       }),
       onDelete: () => {
         state.editingNote = {
@@ -924,7 +974,8 @@ export function renderSessionNotesViewer() {
           noteId: note.id,
           intent: item.intent,
           live: false,
-          text: note.text
+          title: note.title || "",
+          text: note.text || ""
         };
         deleteEditedNote();
       }
@@ -948,8 +999,8 @@ export function addNoteToViewedSession() {
   const previous = sessionNoteItems(item);
   const next = [
     ...previous,
-    { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, text, createdAt: new Date().toISOString() }
-  ];
+    normalizeNoteFields({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, title: "", text, createdAt: new Date().toISOString() })
+  ].filter(Boolean);
   applyNoteItems(item, next);
   if (!saveHistory()) {
     applyNoteItems(item, previous);
@@ -968,47 +1019,247 @@ export function exportCsv() {
   download("locked-in-history.csv","\uFEFF"+[header,...rows].map(row=>row.map(csvEscape).join(",")).join("\r\n"),"text/csv;charset=utf-8");showToast("Spreadsheet download ready.");
 }
 
-export function exportJson() {
-  if (!state.history.length) {
-    showToast("There are no sessions to back up.");
+function readThemeKey() {
+  try { return localStorage.getItem(THEME_KEY) || "dark"; } catch (_) { return "dark"; }
+}
+
+function cloneJson(value) {
+  try { return value == null ? value : JSON.parse(JSON.stringify(value)); } catch (_) { return null; }
+}
+
+function normalizeImportedInbox(raw) {
+  if (!Array.isArray(raw)) return null;
+  return raw
+    .map((n) => normalizeNoteFields(n))
+    .filter(Boolean)
+    .slice(0, 200);
+}
+
+function normalizeImportedRecentGoals(raw) {
+  if (!Array.isArray(raw)) return null;
+  return raw.map((g) => ({
+    intent: String(g?.intent || "").trim().slice(0, 120),
+    durationPreset: String(g?.durationPreset || "45"),
+    customSeconds: Math.max(0, Math.floor(Number(g?.customSeconds) || 0)),
+    style: g?.style === "hardcore" ? "hardcore" : "standard",
+    tag: String(g?.tag || "").trim().slice(0, 24)
+  })).filter((g) => g.intent.length >= 2).slice(0, 5);
+}
+
+function normalizeImportedFocusGoals(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  loadFocusGoals();
+  const base = { ...state.focusGoals };
+  return {
+    dailyMinutes: Number.isFinite(Number(raw.dailyMinutes)) ? Number(raw.dailyMinutes) : base.dailyMinutes,
+    weeklyMinutes: Number.isFinite(Number(raw.weeklyMinutes)) ? Number(raw.weeklyMinutes) : base.weeklyMinutes,
+    weekStartsOn: Number.isFinite(Number(raw.weekStartsOn)) ? Number(raw.weekStartsOn) : base.weekStartsOn,
+    activeWeekKey: typeof raw.activeWeekKey === "string" ? raw.activeWeekKey : base.activeWeekKey
+  };
+}
+
+function persistFocusGoalsSnapshot(goals) {
+  if (!goals) return true;
+  state.focusGoals = goals;
+  return safeWrite(FOCUS_GOALS_KEY, {
+    dailyMinutes: goals.dailyMinutes,
+    weeklyMinutes: goals.weeklyMinutes,
+    weekStartsOn: goals.weekStartsOn,
+    activeWeekKey: goals.activeWeekKey || null
+  });
+}
+
+function applyImportedLook(themeValue) {
+  const theme = String(themeValue || "").trim();
+  const userId = parseUserThemeKey(theme);
+  if (userId) {
+    if (applyUserTheme(userId)) return;
+  }
+  if (theme === "custom" || state.customizePack?.mode === "custom") {
+    applyCustomizePack(state.customizePack);
+    try { localStorage.setItem(THEME_KEY, theme || "custom"); } catch (_) {}
+    document.dispatchEvent(new CustomEvent("locked-in:customize-mode"));
     return;
   }
-  download("locked-in-backup.json",JSON.stringify({schemaVersion:4,exportedAt:new Date().toISOString(),app:"Locked-In",sessions:state.history,notesInbox:state.inbox,todos:state.todos},null,2),"application/json");showToast("Backup file ready.");
+  const presets = ["dark", "light", "forest", "violet", "pink", "blue"];
+  setTheme(presets.includes(theme) ? theme : "dark", true);
+}
+
+/** Full device backup for moving Locked-In data between browsers/devices. */
+export function exportJson() {
+  loadCustomizePack();
+  const payload = {
+    schemaVersion: 5,
+    exportedAt: new Date().toISOString(),
+    app: "Locked-In",
+    sessions: state.history || [],
+    notesInbox: state.inbox || [],
+    noteGroups: state.noteGroups || [],
+    todos: state.todos || null,
+    prefs: state.prefs || safeRead(PREFS_KEY, null),
+    focusGoals: state.focusGoals || safeRead(FOCUS_GOALS_KEY, null),
+    weekReports: state.weekReports || safeRead(WEEK_REPORTS_KEY, []),
+    recentGoals: state.recentGoals || safeRead(RECENT_GOALS_KEY, []),
+    customize: state.customizePack || safeRead(CUSTOMIZE_KEY, null),
+    userThemes: loadUserThemes(),
+    theme: readThemeKey()
+  };
+  download(
+    "locked-in-device-backup.json",
+    JSON.stringify(payload, null, 2),
+    "application/json"
+  );
+  showToast("Device backup ready.");
 }
 
 export async function importJson(file) {
-  if(!file)return;
-  if(file.size>MAX_IMPORT_BYTES){showToast("That file is larger than 2 MB.");dom.importJsonInput.value="";return;}
-  try{
-    const parsed=JSON.parse(await file.text());
-    const incoming=Array.isArray(parsed)?parsed:parsed?.sessions;
-    if(!Array.isArray(incoming)||incoming.length>MAX_HISTORY||incoming.some(r=>!r||typeof r!=="object"||!String(r.intent??r.goal??r.task??"").trim()))throw new Error("schema");
-    const normalized=incoming.map(normalizeRecord).filter(Boolean);
-    const replace=window.confirm("Restore backup: press OK to replace your history, or Cancel to merge it with your existing sessions.");
-    const previousHistory=state.history.slice();
-    const previousInbox=state.inbox.slice();
-    const previousTodos=state.todos ? JSON.parse(JSON.stringify(state.todos)) : null;
-    if(replace)state.history=normalized;else{const map=new Map(state.history.map(r=>[r.id,r]));normalized.forEach(r=>map.set(r.id,r));state.history=[...map.values()].sort((a,b)=>Date.parse(b.completedAt)-Date.parse(a.completedAt)).slice(0,MAX_HISTORY);}
-    if(Array.isArray(parsed.notesInbox))state.inbox=parsed.notesInbox.map(n=>({id:String(n.id||`${Date.now()}-${Math.random()}`),text:String(n.text||"").slice(0,2000),createdAt:n.createdAt||new Date().toISOString()})).filter(n=>n.text.trim()).slice(0,200);
-    if(parsed.todos && typeof parsed.todos === "object") state.todos = normalizeTodosDoc(parsed.todos);
-    const historyOk=saveHistory();
-    const inboxOk=Array.isArray(parsed.notesInbox) ? saveInbox() : true;
-    const todosOk=parsed.todos && typeof parsed.todos === "object" ? saveTodos() : true;
-    if (!historyOk || !inboxOk || !todosOk) {
-      state.history=previousHistory;
-      state.inbox=previousInbox;
-      state.todos=previousTodos;
-      showToast("Could not restore — browser storage unavailable. Try Save backup first.");
+  if (!file) return;
+  if (file.size > MAX_IMPORT_BYTES) {
+    showToast("That file is larger than 5 MB.");
+    dom.importJsonInput.value = "";
+    return;
+  }
+  try {
+    const parsed = JSON.parse(await file.text());
+    const isObjectBackup = parsed && typeof parsed === "object" && !Array.isArray(parsed);
+    const incoming = Array.isArray(parsed) ? parsed : parsed?.sessions;
+    if (!Array.isArray(incoming) || incoming.length > MAX_HISTORY) throw new Error("schema");
+    if (incoming.some((r) => !r || typeof r !== "object" || !String(r.intent ?? r.goal ?? r.task ?? "").trim())) {
+      throw new Error("schema");
+    }
+    // Empty session list is OK for full device backups (themes/todos-only).
+    if (!incoming.length && !(isObjectBackup && (parsed.schemaVersion >= 5 || parsed.todos || parsed.customize || parsed.prefs))) {
+      throw new Error("schema");
+    }
+    const normalized = incoming.map(normalizeRecord).filter(Boolean);
+    const replace = window.confirm(
+      "Import device backup: OK replaces data on this device (history + linked settings). Cancel merges sessions and still applies themes/settings from the file."
+    );
+
+    const previous = {
+      history: state.history.slice(),
+      inbox: state.inbox.slice(),
+      noteGroups: cloneJson(state.noteGroups),
+      todos: cloneJson(state.todos),
+      prefs: cloneJson(state.prefs),
+      focusGoals: cloneJson(state.focusGoals),
+      weekReports: cloneJson(state.weekReports),
+      recentGoals: cloneJson(state.recentGoals),
+      customize: cloneJson(state.customizePack),
+      userThemes: loadUserThemes(),
+      theme: readThemeKey()
+    };
+
+    if (replace) state.history = normalized;
+    else {
+      const map = new Map(state.history.map((r) => [r.id, r]));
+      normalized.forEach((r) => map.set(r.id, r));
+      state.history = [...map.values()]
+        .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))
+        .slice(0, MAX_HISTORY);
+    }
+
+    const nextInbox = isObjectBackup ? normalizeImportedInbox(parsed.notesInbox) : null;
+    if (nextInbox) state.inbox = nextInbox;
+
+    const hasNoteGroups = isObjectBackup && Array.isArray(parsed.noteGroups);
+    if (hasNoteGroups) {
+      state.noteGroups = parsed.noteGroups.map((g) => normalizeNoteGroup(g)).filter(Boolean).slice(0, MAX_NOTE_GROUPS);
+    }
+
+    const hasTodos = isObjectBackup && parsed.todos && typeof parsed.todos === "object";
+    if (hasTodos) state.todos = normalizeTodosDoc(parsed.todos);
+
+    const hasPrefs = isObjectBackup && parsed.prefs && typeof parsed.prefs === "object";
+    if (hasPrefs) {
+      state.prefs = { ...state.prefs, ...parsed.prefs };
+    }
+
+    const nextGoals = isObjectBackup ? normalizeImportedFocusGoals(parsed.focusGoals) : null;
+    if (nextGoals) state.focusGoals = nextGoals;
+
+    const hasWeekReports = isObjectBackup && Array.isArray(parsed.weekReports);
+    if (hasWeekReports) {
+      state.weekReports = parsed.weekReports
+        .filter((r) => r && r.weekStartKey)
+        .slice(0, MAX_WEEK_REPORTS);
+    }
+
+    const nextRecent = isObjectBackup ? normalizeImportedRecentGoals(parsed.recentGoals) : null;
+    if (nextRecent) state.recentGoals = nextRecent;
+
+    const hasCustomize = isObjectBackup && parsed.customize && typeof parsed.customize === "object";
+    const hasUserThemes = isObjectBackup && Array.isArray(parsed.userThemes);
+    const nextUserThemes = hasUserThemes ? parsed.userThemes : null;
+    const nextTheme = isObjectBackup && typeof parsed.theme === "string" ? parsed.theme : null;
+
+    const historyOk = saveHistory();
+    const inboxOk = nextInbox ? saveInbox() : true;
+    const groupsOk = hasNoteGroups ? saveNoteGroups() : true;
+    const todosOk = hasTodos ? saveTodos() : true;
+    const prefsOk = hasPrefs ? savePrefs() : true;
+    const goalsOk = nextGoals ? persistFocusGoalsSnapshot(nextGoals) : true;
+    const weekOk = hasWeekReports ? saveWeekReports() : true;
+    const recentOk = nextRecent ? safeWrite(RECENT_GOALS_KEY, nextRecent) : true;
+    const customizeOk = hasCustomize ? saveCustomizePack(parsed.customize) : true;
+    const themesOk = nextUserThemes ? saveUserThemes(nextUserThemes) : true;
+    let themeOk = true;
+    if (nextTheme) {
+      try { localStorage.setItem(THEME_KEY, nextTheme); } catch (_) { themeOk = false; }
+    }
+
+    if (!historyOk || !inboxOk || !groupsOk || !todosOk || !prefsOk || !goalsOk || !weekOk || !recentOk || !customizeOk || !themesOk || !themeOk) {
+      state.history = previous.history;
+      state.inbox = previous.inbox;
+      state.noteGroups = previous.noteGroups || [];
+      state.todos = previous.todos;
+      state.prefs = previous.prefs;
+      state.focusGoals = previous.focusGoals;
+      state.weekReports = previous.weekReports;
+      state.recentGoals = previous.recentGoals;
+      state.customizePack = previous.customize;
+      saveHistory();
+      saveInbox();
+      saveNoteGroups();
+      if (previous.todos) { state.todos = previous.todos; saveTodos(); }
+      if (previous.prefs) { state.prefs = previous.prefs; savePrefs(); }
+      if (previous.focusGoals) persistFocusGoalsSnapshot(previous.focusGoals);
+      if (previous.weekReports) { state.weekReports = previous.weekReports; saveWeekReports(); }
+      if (previous.recentGoals) safeWrite(RECENT_GOALS_KEY, previous.recentGoals);
+      if (previous.customize) { state.customizePack = previous.customize; saveCustomizePack(previous.customize); }
+      saveUserThemes(previous.userThemes || []);
+      try { localStorage.setItem(THEME_KEY, previous.theme); } catch (_) {}
+      showToast("Could not import — browser storage unavailable. Export a backup first.");
       return;
     }
-    renderAll();showToast(`Restored ${normalized.length} session${normalized.length===1?"":"s"}.`);
-  }catch(_){showToast("Could not restore that file. Choose a Locked-In backup.");}
-  finally{dom.importJsonInput.value="";}
+
+    loadPrefs();
+    applyPrefsToDom();
+    loadFocusGoals();
+    loadRecentGoals();
+    loadWeekReports();
+    loadCustomizePack();
+    applyImportedLook(nextTheme || readThemeKey());
+    renderAll();
+    const parts = [];
+    if (normalized.length) parts.push(`${normalized.length} session${normalized.length === 1 ? "" : "s"}`);
+    if (hasTodos) parts.push("to-dos");
+    if (hasCustomize || hasUserThemes || nextTheme) parts.push("themes");
+    if (hasPrefs || nextGoals || hasWeekReports) parts.push("progress");
+    showToast(parts.length ? `Imported ${parts.join(", ")}.` : "Device backup imported.");
+  } catch (_) {
+    showToast("Could not import that file. Choose a Locked-In device backup.");
+  } finally {
+    dom.importJsonInput.value = "";
+  }
 }
 
 export function clearHistory() {
   if(!state.history.length){showToast("History is already empty.");return;}
-  askConfirm("Clear all history?","This removes saved attempts from this browser. Export a backup first if you want to keep them.",()=>{
+  askConfirm(
+    "Delete session history?",
+    "This removes saved focus attempts only. Notes, to-dos, themes, and preferences stay. Export a backup first if you want to keep the sessions.",
+    ()=>{
     const previous=state.history.slice();
     state.history=[];
     if (!saveHistory()) {
@@ -1016,6 +1267,8 @@ export function clearHistory() {
       showToast("Could not clear history — browser storage unavailable.");
       return;
     }
-    renderAll();showToast("History cleared.");
-  },"Clear history");
+    renderAll();showToast("Session history deleted.");
+  },
+    "Delete history"
+  );
 }

@@ -1,22 +1,11 @@
 /* Locked-In service worker — network-first HTML, cache-first static assets. */
-const CACHE = "locked-in-v92";
-const ASSET_V = "140";
+const CACHE = "locked-in-v114";
+const ASSET_V = "187";
 const PRECACHE = [
   "./",
   "./index.html",
   `./style.css?v=${ASSET_V}`,
-  `./css/tokens.css?v=${ASSET_V}`,
-  `./css/base.css?v=${ASSET_V}`,
-  `./css/layout.css?v=${ASSET_V}`,
-  `./css/components.css?v=${ASSET_V}`,
-  `./css/setup.css?v=${ASSET_V}`,
-  `./css/timer.css?v=${ASSET_V}`,
-  `./css/report.css?v=${ASSET_V}`,
-  `./css/history.css?v=${ASSET_V}`,
-  `./css/insights.css?v=${ASSET_V}`,
-  `./css/notes.css?v=${ASSET_V}`,
-  `./css/todos.css?v=${ASSET_V}`,
-  `./css/customize.css?v=${ASSET_V}`,
+  `./css/screens.css?v=${ASSET_V}`,
   `./app.js?v=${ASSET_V}`,
   `./js/constants.js?v=${ASSET_V}`,
   `./js/runtime.js?v=${ASSET_V}`,
@@ -33,8 +22,14 @@ const PRECACHE = [
   `./js/todos.js?v=${ASSET_V}`,
   `./js/week-reports.js?v=${ASSET_V}`,
   `./js/customize.js?v=${ASSET_V}`,
+  `./js/settings.js?v=${ASSET_V}`,
   `./js/bind.js?v=${ASSET_V}`,
   "./assets/favicon.svg",
+  "./assets/favicon-32.png",
+  "./assets/favicon-64.png",
+  "./assets/logo-mark.png",
+  "./assets/logo-master.png",
+  "./assets/apple-touch-icon.png",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
   "./assets/icon-512-maskable.png",

@@ -1,63 +1,18 @@
-/* Notes screen — compact compose + flat feeds */
+/* Notes screen — New note CTA + flat feeds */
 
-.notes-capture {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  min-width: 0;
-  flex: 1 1 18rem;
-}
-
-.notes-capture-label {
-  margin: 0;
-  color: var(--text-subtle);
-  font: 650 10px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.notes-capture-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.notes-capture-row input {
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  height: 40px;
-  margin: 0;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-}
-
-.notes-capture-row input::placeholder {
-  color: var(--text-subtle);
-}
-
-.notes-capture-row input:focus {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
-  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  outline-offset: 1px;
-}
-
-.notes-capture-btn {
+.notes-new-btn,
+.notes-new-group-btn {
   flex: 0 0 auto;
   min-height: 40px;
   height: 40px;
-  padding: 0 14px;
+  padding: 0 16px;
   border-radius: 10px;
   white-space: nowrap;
+}
+
+.inbox-notes-group.is-ungrouped .session-notes-group-head h3 {
+  color: color-mix(in srgb, var(--text-muted) 55%, var(--text));
+  font-weight: 700;
 }
 
 .notes-section-head {
@@ -103,14 +58,34 @@
   border-bottom: 0;
 }
 
-.note-card > p {
+.note-card-content {
   grid-column: 1;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.note-card-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.note-card-body {
   margin: 0;
   color: var(--text);
   font-size: 14px;
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.note-card-content .note-card-title + .note-card-body {
+  color: color-mix(in srgb, var(--text) 82%, var(--text-muted));
 }
 
 .note-card > small {
@@ -359,14 +334,26 @@
   border-top-color: color-mix(in srgb, var(--accent) 18%, var(--border));
 }
 
+.session-note-item > .note-card-content,
+.session-note-item > .note-card-title,
+.session-note-item > .note-card-body,
 .session-note-item > p {
   grid-column: 1;
+  min-width: 0;
+}
+
+.session-note-item > p,
+.session-note-item .note-card-body {
   margin: 0;
   color: var(--text);
   font-size: 13px;
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.session-note-item .note-card-title {
+  font-size: 13px;
 }
 
 .session-note-item-foot {
@@ -397,11 +384,19 @@
 }
 
 @media (max-width: 640px) {
-  .notes-capture {
-    flex: 1 1 100%;
+  .notes-new-btn,
+  .notes-new-group-btn {
+    flex: 1 1 auto;
   }
 
-  .notes-capture-btn {
-    min-width: 4.5rem;
+  .notes-search,
+  .notes-filters {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .notes-filters .compact-field {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
   }
 }

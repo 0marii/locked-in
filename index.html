@@ -6,25 +6,66 @@
   <meta name="theme-color" content="#101310">
   <meta name="description" content="Locked-In is a simple, customizable focus timer to plan deep-work sessions, track breaks, and review your focus habits.">
   <meta name="robots" content="index,follow">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <link rel="canonical" href="https://0marii.github.io/locked-in/">
   <title>Locked-In — Focus Timer & Deep Work Tracker</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="./assets/favicon-64.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="apple-touch-icon" href="./assets/icon-192.png">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Locked-In">
   <meta name="author" content="Mohammad Al-Omari">
   <meta name="color-scheme" content="dark light">
-  <link rel="stylesheet" href="./style.css?v=140">
-  
+  <!-- Tiny critical CSS so the Setup hero (LCP) can paint before the full bundle. -->
+  <style id="critical-css">
+    html{background:#101310;color:#f2f4ed}
+    html[data-theme="light"]{background:#f5f5f0;color:#1a1c16}
+    body{margin:0;font:400 16px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .skip-link{position:absolute;left:-999px}
+    .site-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#101310;border-bottom:1px solid rgba(255,255,255,.08)}
+    .brand{display:inline-flex;align-items:center;gap:10px;color:inherit;text-decoration:none}
+    .brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;overflow:hidden;background:transparent}
+    .brand-mark img{width:100%;height:100%;object-fit:contain;display:block}
+    .brand-copy{display:grid;gap:4px;line-height:1.1}.brand-copy strong{font-size:15px}.brand-copy small{display:none}
+    .page-shell{width:min(1100px,calc(100% - 28px));margin:0 auto}
+    .screen{display:none;padding:28px 0 40px}.screen.is-active{display:block}
+    .hero{margin-bottom:18px}
+    .eyebrow{margin:0 0 8px;color:#b6f25c;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+    .hero h1{margin:0;font-size:clamp(32px,8vw,60px);line-height:1.05;letter-spacing:-.04em;font-weight:750}
+    .hero h1 span{color:#b6f25c}
+    .hero-copy{margin:12px 0 0;color:rgba(242,244,237,.72);font-size:15px;max-width:36rem}
+  </style>
+  <!-- Full CSS loads async after critical hero styles (mobile LCP). -->
+  <link rel="preload" href="./style.css?v=187" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="stylesheet" href="./css/screens.css?v=187" media="print" onload="this.media='all'">
+  <noscript>
+    <link rel="stylesheet" href="./style.css?v=187">
+    <link rel="stylesheet" href="./css/screens.css?v=187">
+  </noscript>
+  <script>
+    /*! loadCSS rel=preload polyfill-ish */
+    (function () {
+      var links = document.querySelectorAll('link[rel="preload"][as="style"]');
+      for (var i = 0; i < links.length; i++) {
+        var l = links[i];
+        if (l.rel === "stylesheet") continue;
+        l.addEventListener("load", function () { this.rel = "stylesheet"; });
+      }
+    })();
+  </script>
+
   <!-- Prevent Theme FOUC -->
   <script>
     (function() {
       try {
         var saved = localStorage.getItem("locked_in_theme");
         var system = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-        var chosen = saved || system;
+        var presets = { dark:1, light:1, forest:1, violet:1, pink:1, blue:1 };
+        // Named / unsaved custom themes apply CSS vars after JS; keep a preset base for FOUC.
+        var chosen = (saved && presets[saved]) ? saved : system;
         document.documentElement.dataset.theme = chosen;
         var bg = chosen === "light" ? "#f5f5f0" : (chosen === "forest" ? "#0b1714" : (chosen === "pink" ? "#ebebeb" : (chosen === "violet" ? "#15121e" : (chosen === "blue" ? "#0b1424" : "#101310"))));
         document.querySelector('meta[name="theme-color"]').setAttribute("content", bg);
@@ -59,7 +100,6 @@
   }
   </script>
   
-  <script type="module" src="./app.js?v=140"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
@@ -73,13 +113,9 @@
 
   <header class="site-header">
     <a class="brand" href="./#setup" aria-label="Locked-In home">
-      <span class="brand-mark" aria-hidden="true">LI</span>
+      <span class="brand-mark" aria-hidden="true"><img src="./assets/logo-mark.png" width="38" height="38" alt=""></span>
       <span class="brand-copy"><strong>Locked-In</strong><small>FOCUS WITH INTENTION</small></span>
     </a>
-
-    <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="site-nav">
-      <span></span><span></span><span></span>
-    </button>
 
     <nav class="site-nav" id="site-nav" aria-label="Main navigation">
       <button class="nav-link is-active" type="button" data-screen="setup-screen"><span class="nav-icon" data-nav-icon="setup" hidden aria-hidden="true"></span><span>Timer</span></button>
@@ -88,6 +124,12 @@
       <button class="nav-link" type="button" data-screen="notes-screen"><span class="nav-icon" data-nav-icon="notes" hidden aria-hidden="true"></span><span>Notes</span></button>
       <button class="nav-link" type="button" data-screen="todos-screen"><span class="nav-icon" data-nav-icon="todos" hidden aria-hidden="true"></span><span>To-Do</span></button>
       <button class="nav-link" type="button" data-screen="customize-screen"><span class="nav-icon" data-nav-icon="customize" hidden aria-hidden="true"></span><span>Customize</span></button>
+      <button class="nav-link nav-link-settings" type="button" data-screen="settings-screen" aria-label="Settings" title="Settings">
+        <span class="nav-icon" data-nav-icon="settings" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></span>
+      </button>
+    </nav>
+
+    <div class="header-actions">
       <div class="theme-picker">
         <button class="theme-button" id="theme-button" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Theme picker">
           <span class="theme-swatch" aria-hidden="true"></span><span class="theme-name">Dark</span><span class="theme-caret" aria-hidden="true"></span>
@@ -100,9 +142,13 @@
           <button type="button" data-theme="pink" role="radio"><span class="swatch swatch-pink"></span>Pink</button>
           <button type="button" data-theme="blue" role="radio"><span class="swatch swatch-blue"></span>Blue</button>
           <button type="button" data-theme="custom" role="radio"><span class="swatch swatch-custom"></span>Custom</button>
+          <div class="user-theme-list" id="user-theme-list" hidden></div>
         </div>
       </div>
-    </nav>
+      <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="site-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </header>
 
   <button type="button" class="floating-timer is-hidden" id="floating-timer" hidden aria-live="off">
@@ -132,11 +178,22 @@
             <div><p class="eyebrow">SET YOUR INTENTION</p><h2>What are you working on?</h2></div>
           </div>
 
-          <div class="field">
-            <label for="task-intent">Your focus goal</label>
+          <div class="field setup-intent-field">
+            <label for="task-intent">Focus goal</label>
             <input id="task-intent" name="intent" type="text" maxlength="120" placeholder="e.g. Coding, writing, studying…" autocomplete="off" required>
-            <p class="field-hint">One clear goal works best — coding, writing, studying, or anything else.</p>
-            <p class="recent-goals-label is-hidden" id="recent-goals-label">Tap a recent goal to refill</p>
+            <div class="setup-todo-link-bar is-hidden" id="setup-todo-link-bar" hidden>
+              <span class="setup-todo-link-label">Linked</span>
+              <strong class="setup-todo-link-name" id="setup-todo-link-name">To-do</strong>
+              <button class="text-button setup-todo-unlink" id="setup-todo-unlink" type="button">Unlink</button>
+            </div>
+            <div class="setup-todo-pick-row">
+              <label class="visually-hidden" for="setup-todo-pick">Link an open to-do</label>
+              <select id="setup-todo-pick" aria-label="Link an open to-do to this session">
+                <option value="">Link a to-do (optional)…</option>
+              </select>
+            </div>
+            <p class="field-hint">Type a goal, or link a to-do — linking fills the goal and starts that task’s timer when you focus.</p>
+            <p class="recent-goals-label is-hidden" id="recent-goals-label">Recent</p>
             <div class="recent-goals is-hidden" id="recent-goals" aria-label="Recent goals"></div>
           </div>
 
@@ -147,6 +204,7 @@
               <option value="Study">Study</option>
               <option value="Code">Code</option>
               <option value="Writing">Writing</option>
+              <option value="Testing">Testing</option>
               <option value="Other">Other</option>
             </select>
             <input id="goal-tag-custom" class="is-hidden" type="text" maxlength="24" placeholder="Custom tag…" aria-label="Custom tag" aria-hidden="true">
@@ -154,12 +212,11 @@
 
           <div class="field">
             <label for="duration-preset">How long do you want to focus?</label>
-            <select id="duration-preset" name="durationPreset">
-              <option value="25">25 minutes · Quick focus</option>
-              <option value="45" selected>45 minutes · Deep work</option>
-              <option value="60">60 minutes · Long session</option>
-              <option value="90">90 minutes · Extended focus</option>
-              <option value="custom">Custom duration…</option>
+            <select id="duration-preset" name="durationPreset" class="duration-preset-select">
+              <option value="30">30 minutes</option>
+              <option value="45" selected>45 minutes</option>
+              <option value="60">1 hour</option>
+              <option value="custom">Custom…</option>
             </select>
           </div>
 
@@ -200,6 +257,8 @@
             </button>
             <div class="prefs-body is-hidden" id="prefs-body" hidden>
               <div class="prefs-group">
+                <p class="settings-permission-status" id="settings-notify-status" role="status">Checking notification permission…</p>
+                <button class="button button-secondary button-small" id="settings-notify-permit-btn" type="button">Allow browser notifications</button>
                 <label class="prefs-toggle">
                   <input id="pref-notify-end" type="checkbox">
                   <span class="prefs-toggle-copy">
@@ -224,14 +283,20 @@
                   </label>
                   <div class="prefs-card-extra is-hidden" id="pref-pomodoro-interval-wrap" hidden>
                     <label for="pref-pomodoro-minutes">Remind every</label>
-                    <select id="pref-pomodoro-minutes" aria-label="Break suggestion interval">
-                      <option value="15">15 min</option>
-                      <option value="20">20 min</option>
-                      <option value="25" selected>25 min</option>
-                      <option value="30">30 min</option>
-                      <option value="45">45 min</option>
-                      <option value="60">60 min</option>
-                    </select>
+                    <div class="prefs-pomodoro-controls">
+                      <select id="pref-pomodoro-minutes" class="prefs-pomodoro-select" aria-label="Break suggestion interval" aria-describedby="pref-pomodoro-hint">
+                        <option value="30" selected>30 min</option>
+                        <option value="45">45 min</option>
+                        <option value="60">1 hour</option>
+                        <option value="custom">Custom…</option>
+                      </select>
+                      <div class="prefs-pomodoro-custom is-hidden" id="pref-pomodoro-custom-wrap" hidden>
+                        <label class="visually-hidden" for="pref-pomodoro-custom-minutes">Custom minutes</label>
+                        <input id="pref-pomodoro-custom-minutes" type="number" inputmode="numeric" min="5" max="180" step="1" value="30" aria-label="Custom reminder minutes" aria-describedby="pref-pomodoro-hint">
+                        <span class="prefs-pomodoro-custom-unit" aria-hidden="true">min</span>
+                      </div>
+                    </div>
+                    <p class="prefs-pomodoro-hint" id="pref-pomodoro-hint" role="status" aria-live="polite" hidden></p>
                   </div>
                 </div>
               </div>
@@ -279,6 +344,10 @@
                 </div>
                 <p class="prefs-hint" id="pref-chime-hint">Quiet two-note chime when a session completes.</p>
               </div>
+
+              <button class="button button-secondary button-full setup-open-settings-btn" id="setup-open-settings-btn" type="button">
+                Backup &amp; data in Settings
+              </button>
             </div>
           </div>
         </form>
@@ -299,7 +368,7 @@
                 <p class="eyebrow">TO-DO</p>
                 <h2 id="setup-todos-headline">Nothing planned</h2>
               </div>
-              <button class="text-button" id="setup-todos-open-btn" type="button">Open →</button>
+              <button class="text-button" id="setup-todos-open-btn" type="button">To-Do →</button>
             </div>
             <div class="setup-todos-metrics" aria-label="To-do counts">
               <button type="button" class="setup-todos-metric" data-setup-todo-view="myday" aria-label="Open My Day tasks">
@@ -552,13 +621,16 @@
           <div class="focus-goal-block" data-goal="daily">
             <div class="goal-editor-head">
               <label for="goal-daily-slider">Daily</label>
-              <div class="goal-time-edit" aria-label="Daily goal duration">
-                <label class="visually-hidden" for="goal-daily-hours">Hours</label>
-                <input id="goal-daily-hours" type="number" inputmode="numeric" min="0" max="23" step="1" value="2" aria-label="Daily hours">
-                <span class="goal-time-sep" aria-hidden="true">h</span>
-                <label class="visually-hidden" for="goal-daily-mins">Minutes</label>
-                <input id="goal-daily-mins" type="number" inputmode="numeric" min="0" max="59" step="5" value="00" aria-label="Daily minutes">
-                <span class="goal-time-sep" aria-hidden="true">m</span>
+              <div class="goal-time-wrap">
+                <div class="goal-time-edit" id="goal-daily-time-edit" aria-label="Daily goal duration">
+                  <label class="visually-hidden" for="goal-daily-hours">Hours</label>
+                  <input id="goal-daily-hours" type="number" inputmode="numeric" min="0" max="12" step="1" value="2" aria-label="Daily hours" aria-describedby="goal-daily-limit-hint">
+                  <span class="goal-time-sep" aria-hidden="true">h</span>
+                  <label class="visually-hidden" for="goal-daily-mins">Minutes</label>
+                  <input id="goal-daily-mins" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="Daily minutes" aria-describedby="goal-daily-limit-hint">
+                  <span class="goal-time-sep" aria-hidden="true">m</span>
+                </div>
+                <p class="goal-limit-hint" id="goal-daily-limit-hint" role="status" aria-live="polite" hidden></p>
               </div>
             </div>
             <strong id="goal-daily-display" class="visually-hidden" aria-live="polite">2h 00m</strong>
@@ -571,17 +643,20 @@
           <div class="focus-goal-block" data-goal="weekly">
             <div class="goal-editor-head">
               <label for="goal-weekly-slider">Weekly</label>
-              <div class="goal-time-edit" aria-label="Weekly goal duration">
-                <label class="visually-hidden" for="goal-weekly-hours">Hours</label>
-                <input id="goal-weekly-hours" type="number" inputmode="numeric" min="0" max="168" step="1" value="10" aria-label="Weekly hours">
-                <span class="goal-time-sep" aria-hidden="true">h</span>
-                <label class="visually-hidden" for="goal-weekly-mins">Minutes</label>
-                <input id="goal-weekly-mins" type="number" inputmode="numeric" min="0" max="59" step="5" value="00" aria-label="Weekly minutes">
-                <span class="goal-time-sep" aria-hidden="true">m</span>
+              <div class="goal-time-wrap">
+                <div class="goal-time-edit" id="goal-weekly-time-edit" aria-label="Weekly goal duration">
+                  <label class="visually-hidden" for="goal-weekly-hours">Hours</label>
+                  <input id="goal-weekly-hours" type="number" inputmode="numeric" min="0" max="84" step="1" value="10" aria-label="Weekly hours" aria-describedby="goal-weekly-limit-hint">
+                  <span class="goal-time-sep" aria-hidden="true">h</span>
+                  <label class="visually-hidden" for="goal-weekly-mins">Minutes</label>
+                  <input id="goal-weekly-mins" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="Weekly minutes" aria-describedby="goal-weekly-limit-hint">
+                  <span class="goal-time-sep" aria-hidden="true">m</span>
+                </div>
+                <p class="goal-limit-hint" id="goal-weekly-limit-hint" role="status" aria-live="polite" hidden></p>
               </div>
             </div>
             <strong id="goal-weekly-display" class="visually-hidden" aria-live="polite">10h 00m</strong>
-            <input id="goal-weekly-slider" class="goal-slider" type="range" min="30" max="2520" step="30" value="600" aria-valuetext="10 hours">
+            <input id="goal-weekly-slider" class="goal-slider" type="range" min="30" max="5040" step="30" value="600" aria-valuetext="10 hours">
             <div class="goal-progress-foot">
               <p class="goal-progress-copy" id="insights-weekly-progress-label">0m / 10h this week</p>
               <div class="goal-progress-track" aria-hidden="true"><span id="insights-weekly-progress-bar"></span></div>
@@ -596,8 +671,8 @@
           </div>
           <div class="focus-week-reset-controls">
             <label class="focus-week-reset-field" for="goal-week-starts-on">
-              <span class="visually-hidden">Auto-reset day</span>
-              <select id="goal-week-starts-on" aria-label="Auto-reset day" aria-describedby="goal-week-reset-hint">
+              <span class="visually-hidden">Week starts on</span>
+              <select id="goal-week-starts-on" aria-label="Week starts on" aria-describedby="goal-week-reset-hint">
                 <option value="0">Sunday</option>
                 <option value="1" selected>Monday</option>
                 <option value="2">Tuesday</option>
@@ -693,17 +768,50 @@
       <div class="section-hero notes-hero">
         <p class="eyebrow">YOUR NOTES</p>
         <h1 id="notes-title">Thoughts worth keeping.</h1>
-        <p>Inbox for quick thoughts. Session notes appear after you focus.</p>
+        <p>Group inbox notes like sessions. Session notes appear after you focus.</p>
       </div>
       <div class="notes-toolbar">
-        <form id="note-capture-form" class="notes-capture">
-          <label class="notes-capture-label" for="note-capture-input">Quick note</label>
-          <div class="notes-capture-row">
-            <input id="note-capture-input" type="text" maxlength="2000" placeholder="Write a quick thought…" autocomplete="off">
-            <button class="button button-primary notes-capture-btn" type="submit">Add</button>
-          </div>
-        </form>
+        <button class="button button-primary notes-new-btn" id="notes-new-btn" type="button">New note</button>
+        <button class="button button-secondary notes-new-group-btn" id="notes-new-group-btn" type="button">New group</button>
         <label class="search-field notes-search" for="notes-search"><span aria-hidden="true">⌕</span><input id="notes-search" type="search" placeholder="Search notes…" autocomplete="off"></label>
+        <div class="notes-filters" id="notes-filters">
+          <label class="compact-field compact-field-select" for="notes-scope-filter">
+            <span>Show</span>
+            <select id="notes-scope-filter" aria-label="Filter notes by source">
+              <option value="all" selected>All notes</option>
+              <option value="inbox">Thoughts</option>
+              <option value="sessions">Sessions</option>
+            </select>
+          </label>
+          <label class="compact-field compact-field-select" for="notes-group-filter" id="notes-group-filter-wrap">
+            <span>Group</span>
+            <select id="notes-group-filter" aria-label="Filter thoughts by group">
+              <option value="all" selected>All groups</option>
+              <option value="ungrouped">Ungrouped</option>
+            </select>
+          </label>
+          <label class="compact-field compact-field-select is-hidden" for="notes-session-pick" id="notes-session-pick-wrap" hidden>
+            <span>Session</span>
+            <select id="notes-session-pick" aria-label="Filter by session">
+              <option value="all" selected>All sessions</option>
+            </select>
+          </label>
+          <div class="compact-field date-field is-hidden" id="notes-date-from-wrap" data-notes-date-field="from" hidden>
+            <span id="notes-date-from-label">From</span>
+            <button class="date-field-trigger" id="notes-date-from-btn" type="button" data-date-picker-anchor aria-haspopup="dialog" aria-expanded="false" aria-labelledby="notes-date-from-label">
+              <span class="date-field-value is-empty" id="notes-date-from-display">Any date</span>
+            </button>
+            <input id="notes-date-from" type="hidden" value="">
+          </div>
+          <div class="compact-field date-field is-hidden" id="notes-date-to-wrap" data-notes-date-field="to" hidden>
+            <span id="notes-date-to-label">To</span>
+            <button class="date-field-trigger" id="notes-date-to-btn" type="button" data-date-picker-anchor aria-haspopup="dialog" aria-expanded="false" aria-labelledby="notes-date-to-label">
+              <span class="date-field-value is-empty" id="notes-date-to-display">Any date</span>
+            </button>
+            <input id="notes-date-to" type="hidden" value="">
+          </div>
+          <button class="button button-secondary button-small notes-clear-filters-btn is-hidden" id="notes-clear-filters-btn" type="button" hidden>Clear</button>
+        </div>
         <div class="notes-filter-bar is-hidden" id="notes-filter-bar" role="status" aria-live="polite" hidden>
           <span class="notes-filter-copy">
             <strong>Filter on</strong>
@@ -716,7 +824,7 @@
         <section class="notes-section" id="notes-inbox-panel">
           <header class="notes-section-head">
             <h2>Inbox</h2>
-            <span class="notes-section-hint">Anytime</span>
+            <span class="notes-section-hint">Grouped anytime</span>
           </header>
           <div id="notes-inbox" class="notes-feed"></div>
         </section>
@@ -752,8 +860,69 @@
         </div>
         <p class="customize-mode-pill" id="customize-mode-label">Using preset theme</p>
       </div>
+      <p class="customize-save-reminder is-hidden" id="customize-save-reminder" role="status" aria-live="polite" hidden>
+        Unsaved edits — use <strong>Save to My Themes</strong> (or <strong>Export theme</strong>) or they can be lost when you switch themes.
+      </p>
 
       <div class="customize-layout">
+        <section class="panel customize-panel customize-actions" aria-labelledby="customize-actions-title">
+          <div class="customize-actions-head">
+            <p class="eyebrow">SAVE &amp; SHARE</p>
+            <h2 id="customize-actions-title">Keep this look</h2>
+            <p class="customize-pack-hint">Save it to the theme menu, or export a file. Changes aren’t locked in until you save.</p>
+          </div>
+
+          <div class="customize-action-groups">
+            <div class="customize-action-group">
+              <p class="customize-action-label">My Themes</p>
+              <p class="customize-action-desc">Add this look to the theme picker so you can switch back anytime.</p>
+              <button
+                class="button button-primary"
+                id="customize-save-theme-btn"
+                type="button"
+                title="Save this look under a name in the theme menu."
+                aria-label="Save to My Themes. Add this look to the theme picker under a name."
+              ><span class="customize-save-heart" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" focusable="false"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>Save to My Themes</button>
+              <div class="customize-save-theme-form" id="customize-save-theme-form" hidden>
+                <label class="customize-save-theme-label" for="customize-theme-name">Theme name</label>
+                <div class="customize-save-theme-row">
+                  <input
+                    id="customize-theme-name"
+                    class="customize-theme-name"
+                    type="text"
+                    maxlength="40"
+                    placeholder="e.g. Midnight"
+                    autocomplete="off"
+                    spellcheck="false"
+                  >
+                  <button class="button button-primary button-small" id="customize-save-theme-confirm" type="button">Save theme</button>
+                  <button class="button button-ghost button-small" id="customize-save-theme-cancel" type="button">Cancel</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="customize-action-group">
+              <p class="customize-action-label">Theme file</p>
+              <p class="customize-action-desc">Download or load a JSON file with colors, font, and nav icons.</p>
+              <div class="customize-action-row">
+                <button
+                  class="button button-secondary"
+                  id="customize-export-btn"
+                  type="button"
+                  title="Download a JSON file with your colors, font, and custom nav icons."
+                  aria-label="Export theme. Download a JSON file with your colors, font, and custom nav icons."
+                >Export theme</button>
+                <label
+                  class="button button-secondary"
+                  title="Choose a previously exported theme file to replace your current colors, font, and nav icons."
+                  aria-label="Import theme. Choose a previously exported theme file."
+                >Import theme<input id="customize-import-input" class="visually-hidden" type="file" accept="application/json,.json"></label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="customize-body">
         <section class="panel customize-panel customize-colors">
           <div class="panel-heading">
             <div><p class="eyebrow">COLORS</p><h2>Theme colors</h2></div>
@@ -853,37 +1022,105 @@
               <label class="button button-secondary button-small">Upload<input id="icon-upload-customize" class="visually-hidden" type="file" accept="image/svg+xml,.svg"></label>
               <button class="button button-ghost button-small" id="icon-clear-customize" type="button">Clear</button>
             </div>
+            <div class="customize-icon-row" data-icon-key="settings">
+              <div class="customize-icon-preview" data-icon-preview="settings" aria-hidden="true">—</div>
+              <div class="customize-icon-meta"><strong>Settings</strong></div>
+              <label class="button button-secondary button-small">Upload<input id="icon-upload-settings" class="visually-hidden" type="file" accept="image/svg+xml,.svg"></label>
+              <button class="button button-ghost button-small" id="icon-clear-settings" type="button">Clear</button>
+            </div>
           </div>
         </section>
 
-        <section class="panel customize-panel customize-pack">
-          <div class="customize-pack-bar">
+        <section class="panel customize-panel customize-reset" aria-labelledby="customize-reset-title">
+          <div class="customize-reset-copy">
+            <p class="eyebrow">START OVER</p>
+            <h2 id="customize-reset-title">Reset customization</h2>
+            <p class="customize-pack-hint">Clear custom colors, font, and icons and return to the active preset theme. Saved themes in the menu stay.</p>
+          </div>
+          <button
+            class="button button-secondary"
+            id="customize-reset-btn"
+            type="button"
+            title="Clear custom colors, font, and icons and return to the active theme preset."
+            aria-label="Reset to preset. Clear custom colors, font, and icons."
+          >Reset to preset</button>
+        </section>
+        </div>
+      </div>
+    </section>
+
+    <section id="settings-screen" class="screen" aria-labelledby="settings-title">
+      <div class="section-hero settings-hero">
+        <p class="eyebrow">APP SETTINGS</p>
+        <h1 id="settings-title">Backup &amp; data.</h1>
+        <p>Export, delete, and version info — preferences live on the Timer screen.</p>
+      </div>
+
+      <div class="settings-stack">
+        <section class="panel settings-panel settings-panel-wide" aria-labelledby="settings-backup-title">
+          <div class="panel-heading">
             <div>
-              <p class="eyebrow">YOUR LOOK</p>
-              <h2>Backup your style</h2>
-              <p class="customize-pack-hint">Keep colors, font, and nav icons together — or start fresh.</p>
+              <p class="eyebrow">DATA</p>
+              <h2 id="settings-backup-title">Backup &amp; transfer</h2>
             </div>
-            <div class="customize-pack-actions">
-              <button
-                class="button button-primary button-small"
-                id="customize-export-btn"
-                type="button"
-                title="Download a JSON file with your colors, font, and custom nav icons so you can keep a backup or move them to another browser."
-                aria-label="Save look. Download a JSON file with your colors, font, and custom nav icons."
-              >Save look</button>
-              <label
-                class="button button-secondary button-small"
-                title="Choose a previously saved look file to replace your current colors, font, and nav icons."
-                aria-label="Load look. Choose a previously saved look file."
-              >Load look<input id="customize-import-input" class="visually-hidden" type="file" accept="application/json,.json"></label>
-              <button
-                class="button button-ghost button-small"
-                id="customize-reset-btn"
-                type="button"
-                title="Clear custom colors, font, and icons and return to the active theme preset."
-                aria-label="Reset to theme. Clear custom colors, font, and icons."
-              >Reset to theme</button>
+          </div>
+          <p class="settings-panel-copy">Move Locked-In to another browser or device. Backups include sessions, notes, todos, preferences, and themes.</p>
+          <div class="settings-actions">
+            <button class="button button-primary" id="settings-export-btn" type="button">Export to other device</button>
+            <button class="button button-secondary" id="settings-import-btn" type="button">Import from other device</button>
+            <button class="button button-secondary" id="settings-csv-btn" type="button">Download spreadsheet</button>
+          </div>
+        </section>
+
+        <section class="panel settings-panel settings-panel-wide settings-panel-danger" aria-labelledby="settings-danger-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">DANGER ZONE</p>
+              <h2 id="settings-danger-title">Delete local data</h2>
             </div>
+          </div>
+          <p class="settings-panel-copy">Export a backup first if you want to keep anything. These actions cannot be undone.</p>
+          <div class="settings-danger-actions">
+            <div class="settings-danger-item">
+              <button
+                class="button button-secondary"
+                id="settings-clear-history-btn"
+                type="button"
+                title="Deletes focus session history only. Notes, to-dos, themes, and preferences stay."
+                aria-describedby="settings-clear-history-hint"
+              >Delete session history</button>
+              <p class="settings-danger-hint" id="settings-clear-history-hint">Removes saved focus attempts from History. Notes, to-dos, themes, and preferences stay.</p>
+            </div>
+            <div class="settings-danger-item">
+              <button
+                class="button button-danger"
+                id="settings-erase-all-btn"
+                type="button"
+                title="Wipes everything Locked-In stores in this browser: sessions, notes, to-dos, themes, and preferences."
+                aria-describedby="settings-erase-all-hint"
+              >Wipe all app data</button>
+              <p class="settings-danger-hint" id="settings-erase-all-hint">Factory-resets Locked-In on this device — sessions, notes, to-dos, themes, and preferences.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel settings-panel settings-panel-wide" aria-labelledby="settings-about-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">ABOUT</p>
+              <h2 id="settings-about-title">Why Locked-In</h2>
+            </div>
+          </div>
+          <div class="settings-about-copy">
+            <p class="settings-panel-copy settings-about-lead">
+              Locked-In is a private focus timer for deep work. Pick one goal, protect the time, track your breaks, and keep a personal record of showing up — history, insights, notes, and to-dos included.
+            </p>
+            <p class="settings-panel-copy">
+              No account. No cloud. Everything stays in this browser until you export a backup. Customize the look, install it like an app, and build a habit you can actually see.
+            </p>
+            <p class="settings-panel-copy settings-about-privacy">
+              Your sessions never leave your device. There is nothing to sign up for and nothing uploaded.
+            </p>
           </div>
         </section>
       </div>
@@ -970,18 +1207,38 @@
       </div>
     </div>
   </dialog>
-  <dialog class="edit-session-dialog" id="edit-note-dialog" aria-labelledby="edit-note-heading">
-    <form id="edit-note-form" class="edit-session-content">
-      <p class="eyebrow">NOTE</p>
-      <h2 id="edit-note-heading">Edit note</h2>
+  <dialog class="edit-session-dialog note-composer-dialog" id="edit-note-dialog" aria-labelledby="edit-note-heading">
+    <form id="edit-note-form" class="edit-session-content note-composer">
+      <p class="eyebrow" id="edit-note-eyebrow">NOTE</p>
+      <h2 id="edit-note-heading">New note</h2>
       <p class="edit-note-context" id="edit-note-context"></p>
-      <label for="edit-note-text">Note text</label>
-      <textarea id="edit-note-text" class="edit-session-notes" rows="5" maxlength="2000" placeholder="Update this note…" required></textarea>
+      <label class="note-composer-label" for="edit-note-title">Title</label>
+      <input id="edit-note-title" class="note-composer-title" type="text" maxlength="120" placeholder="What’s this about?" autocomplete="off">
+      <label class="note-composer-label" for="edit-note-group">Group</label>
+      <select id="edit-note-group" class="note-composer-group" aria-label="Note group">
+        <option value="">Ungrouped</option>
+      </select>
+      <label class="note-composer-label" for="edit-note-text">Body</label>
+      <textarea id="edit-note-text" class="note-composer-body" rows="9" maxlength="2000" placeholder="Write the details…"></textarea>
+      <p class="note-composer-hint" id="edit-note-hint">At least a title or body is required. Press Ctrl/⌘ + Enter to save.</p>
       <div class="dialog-actions">
-        <button class="button button-danger" id="edit-note-delete" type="button">Delete note</button>
+        <button class="button button-danger" id="edit-note-delete" type="button" hidden>Delete note</button>
         <span class="dialog-action-spacer"></span>
         <button class="button button-secondary" type="button" id="edit-note-cancel">Cancel</button>
-        <button class="button button-primary" type="submit">Save note</button>
+        <button class="button button-primary" type="submit" id="edit-note-save">Save note</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog class="edit-session-dialog note-group-dialog" id="note-group-dialog" aria-labelledby="note-group-heading">
+    <form id="note-group-form" class="edit-session-content note-group-form">
+      <p class="eyebrow" id="note-group-eyebrow">INBOX</p>
+      <h2 id="note-group-heading">New group</h2>
+      <p class="note-group-copy" id="note-group-copy">Name a folder for related notes.</p>
+      <label class="note-composer-label" for="note-group-name">Group name</label>
+      <input id="note-group-name" class="note-group-name-input" type="text" maxlength="48" placeholder="e.g. Ideas, Reading, Work…" required autocomplete="off">
+      <div class="dialog-actions">
+        <button class="button button-secondary" type="button" id="note-group-cancel">Cancel</button>
+        <button class="button button-primary" type="submit" id="note-group-save">Create group</button>
       </div>
     </form>
   </dialog>
@@ -995,6 +1252,29 @@
       </div>
     </form>
   </dialog>
+  <dialog class="confirm-dialog leave-customize-dialog" id="leave-customize-dialog" aria-labelledby="leave-customize-title">
+    <div class="confirm-content">
+      <p class="eyebrow">UNSAVED LOOK</p>
+      <h2 id="leave-customize-title">Save this look before leaving?</h2>
+      <p id="leave-customize-message">You changed Customize but haven’t saved it to My Themes. Discard &amp; leave restores the theme you had before these edits.</p>
+      <label class="field leave-customize-name-field" for="leave-customize-theme-name">
+        <span>Theme name</span>
+        <input
+          id="leave-customize-theme-name"
+          type="text"
+          maxlength="40"
+          placeholder="e.g. Midnight"
+          autocomplete="off"
+          spellcheck="false"
+        >
+      </label>
+      <div class="dialog-actions leave-customize-actions">
+        <button class="button button-secondary" id="leave-customize-stay" type="button">Stay</button>
+        <button class="button button-danger-outline" id="leave-customize-discard" type="button">Discard &amp; leave</button>
+        <button class="button button-primary" id="leave-customize-save" type="button">Save theme &amp; leave</button>
+      </div>
+    </div>
+  </dialog>
   <dialog class="confirm-dialog" id="end-session-dialog" aria-labelledby="end-session-title">
     <div class="confirm-content">
       <p class="eyebrow" id="end-session-eyebrow">END SESSION</p>
@@ -1007,5 +1287,14 @@
       </div>
     </div>
   </dialog>
+  <script type="module">
+    // Let first paint / LCP finish before parsing the SPA graph.
+    const boot = () => import("./app.js?v=187");
+    if ("requestIdleCallback" in window) {
+      requestIdleCallback(() => { boot(); }, { timeout: 900 });
+    } else {
+      setTimeout(boot, 1);
+    }
+  </script>
 </body>
 </html>

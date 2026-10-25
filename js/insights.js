@@ -1,7 +1,7 @@
-import { dom, state } from "./runtime.js?v=140";
-import { showToast } from "./toast.js?v=140";
-import { completedRecords, download, formatDuration, localDayKey, scoreFor, startOfWeek } from "./utils.js?v=140";
-import { focusProgress, renderFocusGoals } from "./setup.js?v=140";
+import { dom, state } from "./runtime.js?v=187";
+import { showToast } from "./toast.js?v=187";
+import { completedRecords, download, formatDuration, localDayKey, scoreFor, startOfWeek } from "./utils.js?v=187";
+import { focusProgress, renderFocusGoals } from "./setup.js?v=187";
 
 export function downloadWeekCard() {
   const completed = completedRecords();
@@ -87,7 +87,7 @@ export function renderInsights() {
   if (dom.insightsAnalyticsBody) dom.insightsAnalyticsBody.hidden = !hasCompleted;
   if (hasCompleted) {
     drawWeeklyChart(completed);
-    drawHeatmap(completed);
+    drawHeatmap(completed, { insights: true, setup: false });
     const groups={};completed.forEach(r=>{const h=new Date(r.completedAt).getHours();groups[h]=(groups[h]||0)+r.focusSeconds;});
     const best=Object.entries(groups).sort((a,b)=>b[1]-a[1])[0];dom.bestTime.textContent=best?`${String(Number(best[0])).padStart(2,"0")}:00–${String((Number(best[0])+1)%24).padStart(2,"0")}:00`:"—";
     const goals={};completed.forEach(r=>{goals[r.intent]=(goals[r.intent]||0)+r.focusSeconds;});const bg=Object.entries(goals).sort((a,b)=>b[1]-a[1])[0];dom.bestGoal.textContent=bg?`${bg[0]} · ${formatDuration(bg[1])}`:"—";
@@ -96,8 +96,7 @@ export function renderInsights() {
     if (dom.bestTag) dom.bestTag.textContent=bt?`${bt[0]} · ${formatDuration(bt[1])}`:"—";
     const streaks=calculateStreaks(completed);dom.streakCurrent.textContent=String(streaks.current);dom.streakBest.textContent=String(streaks.best);
   } else {
-    // Keep setup heatmap in sync even when Insights charts are collapsed.
-    drawHeatmap(completed);
+    drawHeatmap(completed, { insights: true, setup: false });
     if (dom.streakCurrent) dom.streakCurrent.textContent = "0";
     if (dom.streakBest) dom.streakBest.textContent = "0";
     if (dom.bestTime) dom.bestTime.textContent = "—";
@@ -204,11 +203,15 @@ export function paintHeatmap(grid, textList, records, monthsEl) {
   }
 }
 
-export function drawHeatmap(records) {
-  const insightsMonths = dom.heatmap?.closest("[data-heatmap-root]")?.querySelector("[data-heatmap-months]");
-  const setupMonths = dom.setupHeatmap?.closest("[data-heatmap-root]")?.querySelector("[data-heatmap-months]");
-  paintHeatmap(dom.heatmap, dom.heatmapText, records, insightsMonths);
-  paintHeatmap(dom.setupHeatmap, dom.setupHeatmapText, records, setupMonths);
+export function drawHeatmap(records, { setup = true, insights = true } = {}) {
+  if (insights && dom.heatmap) {
+    const insightsMonths = dom.heatmap.closest("[data-heatmap-root]")?.querySelector("[data-heatmap-months]");
+    paintHeatmap(dom.heatmap, dom.heatmapText, records, insightsMonths);
+  }
+  if (setup && dom.setupHeatmap) {
+    const setupMonths = dom.setupHeatmap.closest("[data-heatmap-root]")?.querySelector("[data-heatmap-months]");
+    paintHeatmap(dom.setupHeatmap, dom.setupHeatmapText, records, setupMonths);
+  }
 }
 
 export function calculateStreaks(records) {

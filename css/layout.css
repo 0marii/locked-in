@@ -5,11 +5,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(clamp(18px, 5vw, 76px) + env(safe-area-inset-right, 0px)) 16px calc(clamp(18px, 5vw, 76px) + env(safe-area-inset-left, 0px));
   background: var(--nav-bg, color-mix(in srgb, var(--bg) 90%, transparent));
   border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
   backdrop-filter: blur(16px);
+}
+
+.header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.header-actions .theme-picker {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
 }
 
 .floating-timer {
@@ -117,7 +130,24 @@ body.has-floating-timer .page-shell { padding-top: 18px; }
 
 .brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; flex-shrink: 0; }
 
-.brand-mark { display: grid; place-items: center; width: 38px; height: 38px; background: var(--accent); color: var(--accent-ink); border-radius: 11px; font: 800 12px var(--mono); letter-spacing: -.08em; }
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  overflow: hidden;
+  background: transparent;
+  color: var(--accent-ink);
+  flex: 0 0 auto;
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
 
 .brand-copy { display: grid; line-height: 1.1; gap: 5px; }
 
@@ -133,7 +163,13 @@ body.has-floating-timer .page-shell { padding-top: 18px; }
   letter-spacing: .13em;
 }
 
-.site-nav { display: flex; align-items: center; gap: 8px; }
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
 
 .nav-link {
   display: inline-flex;
@@ -166,9 +202,13 @@ body.has-floating-timer .page-shell { padding-top: 18px; }
 
 .page-shell { width: min(1100px, calc(100% - 48px)); margin: 0 auto; }
 
-.screen { display: none; padding: clamp(46px, 7vw, 86px) 0 48px; animation: enter .24s ease both; }
+.screen { display: none; padding: clamp(46px, 7vw, 86px) 0 48px; }
 
 .screen.is-active { display: block; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .screen.is-active { animation: enter .24s ease both; }
+}
 
 /* Hide the browser focus “wrap” from programmatic heading focus when changing screens. */
 

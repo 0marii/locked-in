@@ -8,7 +8,7 @@ A customizable, browser-based focus timer and deep-work tracker. Built with vani
 ## Features
 
 - Focus on a custom goal (for example, coding, studying, writing, reading, or your own text).
-- Choose 25, 45, 60, or 90 minutes, or reveal the custom duration fields to enter hours and minutes.
+- Choose 30 minutes, 45 minutes, 1 hour, or a custom duration (hours and minutes).
 - Standard and optional Hardcore session styles.
 - Timestamp-based countdown calculations to reduce timer drift when the browser throttles interval callbacks.
 - Break tracking with live expected-end times: scheduled end (no breaks) and real end (including breaks).
@@ -23,14 +23,14 @@ A customizable, browser-based focus timer and deep-work tracker. Built with vani
 - Private Insights: completion stats, 7-day chart, 12-week heatmap, streaks, best time, top goal, and top tag.
 - Daily and weekly completed-focus goals with progress on Setup and Insights.
 - Recent goal chips to refill intent, duration, style, and tag.
-- Optional session tags (Study / Code / Writing / custom) with History filter.
+- Optional session tags (Study / Code / Writing / Testing / custom) with History filter.
 - Preferences: end notifications, 5-minute break reminder, completion chime (Off / Soft / Full), optional break suggestions with a chosen interval.
 - Save a local weekly stats PNG from Insights (no upload).
 - History tooltips explain column meaning, completion-score math, and why an outcome was assigned.
 - Edit session notes or delete individual history records.
-- Restore a backup and merge records by session ID.
+- Import a device backup and merge or replace records by session ID.
 - Searchable local session history with date, tag, and sort filters.
-- Download a spreadsheet, save a full backup, or restore from a backup file.
+- Download a spreadsheet, or export/import a full device backup (history, notes, to-dos, prefs, goals, themes).
 - Installable PWA shell (`manifest.webmanifest` + network-first HTML service worker).
 - Six themes: Dark, Light, Forest, Violet, Pink, and Blue.
 - Responsive layout with a mobile hamburger navigation menu.
@@ -93,16 +93,19 @@ App logic and styles are split into native modules under `js/` and `css/` (no bu
 
 ## Run tests
 
-The included Node.js static-contract tests check key UI and persistence contracts without a build step:
+Node-only contract and smoke tests (no browser automation):
 
 ```bash
 npm run check
 ```
 
-Or run the pieces separately:
+Useful pieces:
 
 ```bash
-node --test tests/static-contract.test.cjs
+npm run css
+npm run assets:verify
+npm run assets:bump
+node --test tests/*.test.cjs
 node --check app.js
 node --check js/*.js
 ```
@@ -119,21 +122,33 @@ python3 -m http.server 8000
 
 Then visit `http://localhost:8000`.
 
+## Deploy
+
+Release checklist before pushing to GitHub Pages:
+
+1. Edit `css/*` / `js/*` as needed.
+2. Run `npm run assets:bump` (or `npm run css` if the asset version is unchanged).
+3. Run `npm run predeploy` (syntax + asset verify + contract/smoke tests).
+4. Commit and push to the publishing branch.
+5. Hard-refresh once (or wait for the new service-worker `CACHE`) so clients drop the old precache.
+
+After any CSS edit, always rebundle before push — `style.css` and `css/screens.css` are generated.
+
 ## Deploy to GitHub Pages
 
 This project is designed for a project site hosted at `https://0marii.github.io/locked-in/`.
 
-1. Commit the files to the repository's publishing branch.
+1. Follow the **Deploy** checklist above.
 2. In GitHub, open **Settings → Pages**.
 3. Select the correct branch and `/ (root)` folder (or your existing publishing configuration).
 4. Wait for the Pages deployment to finish.
-5. Open the live URL and test the mobile menu, timer, history, sticky notes, insights, themes, and exports.
+5. Open the live URL and smoke-test the mobile menu, timer, history, sticky notes, insights, themes, and exports.
 
 All internal asset links use relative paths (`./style.css`, `./app.js`, `./assets/favicon.svg`) to work under the `/locked-in/` project path.
 
 ## Privacy and storage
 
-The app stores session history, active session state, notes, preferences, focus goals, recent goals, and the selected theme in browser `localStorage`. It does not upload session information to a server. Data is specific to the browser/device and can be removed when browser data is cleared. Use **Save backup** to download a copy. **Restore backup** merges records and retains topic/note/tag fields when present. Data remains local to your browser; do not use the app on a shared device if your session notes are private. If storage writes fail, the UI keeps drafts dirty and never claims “Saved.” Browser notifications are opt-in and only fire when permission is granted.
+The app stores session history, active session state, notes, preferences, focus goals, recent goals, customize look, named themes, and the selected theme in browser `localStorage`. It does not upload session information to a server. Data is specific to the browser/device and can be removed when browser data is cleared. Use **Export to other device** (History menu) to download a full copy. **Import from other device** can replace or merge sessions and applies themes/settings from the file. Live in-progress timers are not included. Data remains local to your browser; do not use the app on a shared device if your session notes are private. If storage writes fail, the UI keeps drafts dirty and never claims “Saved.” Browser notifications are opt-in and only fire when permission is granted.
 
 ## How the completion score works
 

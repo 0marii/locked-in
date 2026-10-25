@@ -4,9 +4,13 @@
   "private": true,
   "description": "A static, privacy-first focus timer and deep-work tracker.",
   "scripts": {
-    "test": "node --test tests/*.test.cjs",
+    "css": "node scripts/bundle-css.cjs",
+    "assets:bump": "node scripts/bump-assets.cjs",
+    "assets:verify": "node scripts/verify-assets.cjs",
     "check:syntax": "node --check app.js && node --check js/*.js",
-    "check": "npm run check:syntax && npm test"
+    "test": "npm run css && npm run assets:verify && node --test tests/*.test.cjs",
+    "check": "npm run check:syntax && npm test",
+    "predeploy": "npm run check"
   },
   "engines": { "node": ">=18" },
   "license": "MIT"

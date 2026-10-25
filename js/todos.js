@@ -1,11 +1,11 @@
 /** Microsoft To Do–inspired tasks: lists, My Day, due dates, steps. */
-import { MAX_TODO_LISTS, MAX_TODO_STEPS, MAX_TODO_TASKS, PREFS_KEY, TODOS_KEY } from "./constants.js?v=140";
-import { dom, state, tabId } from "./runtime.js?v=140";
-import { safeRead, safeWrite } from "./storage.js?v=140";
-import { showToast } from "./toast.js?v=140";
-import { formatDuration, formatShortDate, localDayKey } from "./utils.js?v=140";
-import { broadcast } from "./sync.js?v=140";
-import { askConfirm, navigate } from "./theme-nav.js?v=140";
+import { MAX_TODO_LISTS, MAX_TODO_STEPS, MAX_TODO_TASKS, PREFS_KEY, TODOS_KEY } from "./constants.js?v=187";
+import { dom, state, tabId } from "./runtime.js?v=187";
+import { safeRead, safeWrite } from "./storage.js?v=187";
+import { showToast } from "./toast.js?v=187";
+import { formatDuration, formatShortDate, localDayKey } from "./utils.js?v=187";
+import { broadcast } from "./sync.js?v=187";
+import { askConfirm, navigate } from "./theme-nav.js?v=187";
 
 export const SMART_MYDAY = "myday";
 export const SMART_IMPORTANT = "important";
@@ -22,6 +22,7 @@ let completedOpen = false;
 let expandedTaskIds = new Set();
 let addDraft = { priority: "medium", dueDate: null };
 let completedFilters = { date: "all", listId: "all", priority: "all", customDate: null };
+let todoTimerTickId = null;
 
 function shiftDayKey(key, days) {
   const d = new Date(`${key}T12:00:00`);
@@ -86,9 +87,13 @@ function completedFiltersHtml(lists) {
   const customLabel = completedFilters.customDate
     ? dueLabel(completedFilters.customDate, { empty: "Pick day" })
     : "Pick day";
+  const dateActive = completedFilters.date !== "all";
+  const listActive = completedFilters.listId !== "all";
+  const priorityActive = completedFilters.priority !== "all";
+  const dayActive = completedFilters.date === "custom" && Boolean(completedFilters.customDate);
   return `
     <div class="todos-completed-filters" role="search" aria-label="Filter completed tasks">
-      <label class="todos-filter-field">
+      <label class="todos-filter-field ${dateActive ? "is-filter-active" : ""}">
         <span class="visually-hidden">Filter by date</span>
         <select id="todos-completed-date" aria-label="Filter by date">
           ${dateOpts.map(([value, label]) => `
@@ -97,11 +102,11 @@ function completedFiltersHtml(lists) {
         </select>
       </label>
       ${completedFilters.date === "custom" ? `
-        <button type="button" class="date-field-trigger todo-due-trigger todos-filter-day-btn" id="todos-completed-day-btn" data-date-picker-anchor aria-haspopup="dialog" aria-expanded="false" aria-label="Completed on date">
+        <button type="button" class="date-field-trigger todo-due-trigger todos-filter-day-btn ${dayActive ? "is-filter-active" : ""}" id="todos-completed-day-btn" data-date-picker-anchor aria-haspopup="dialog" aria-expanded="false" aria-label="Completed on date">
           <span class="date-field-value ${completedFilters.customDate ? "" : "is-empty"}" id="todos-completed-day-display">${escapeHtml(customLabel)}</span>
         </button>
       ` : ""}
-      <label class="todos-filter-field">
+      <label class="todos-filter-field ${listActive ? "is-filter-active" : ""}">
         <span class="visually-hidden">Filter by list</span>
         <select id="todos-completed-list" aria-label="Filter by list">
           <option value="all" ${completedFilters.listId === "all" ? "selected" : ""}>All lists</option>
@@ -110,7 +115,7 @@ function completedFiltersHtml(lists) {
           `).join("")}
         </select>
       </label>
-      <label class="todos-filter-field">
+      <label class="todos-filter-field ${priorityActive ? "is-filter-active" : ""}">
         <span class="visually-hidden">Filter by priority</span>
         <select id="todos-completed-priority" aria-label="Filter by priority">
           ${priorityOpts.map(([value, label]) => `
@@ -139,11 +144,9 @@ function syncAddFormDraft() {
   const dueDisplay = document.getElementById("todos-add-due-display");
   if (priority) {
     const p = normalizePriority(addDraft.priority);
-    priority.className = `todo-action-btn todo-priority-btn is-${p}`;
-    const value = priority.querySelector(".todo-action-value");
-    if (value) value.textContent = priorityLabel(p);
-    priority.setAttribute("aria-label", `Priority ${priorityLabel(p)}. Click to change`);
-    priority.title = `Change priority (now ${priorityLabel(p)})`;
+    priority.value = p;
+    priority.closest(".todo-priority-field")?.classList.remove("is-low", "is-medium", "is-high");
+    priority.closest(".todo-priority-field")?.classList.add(`is-${p}`);
   }
   if (dueDisplay) {
     dueDisplay.textContent = dueLabel(addDraft.dueDate, { empty: "Add date" });
@@ -154,7 +157,7 @@ function syncAddFormDraft() {
 async function openTodoDuePicker(anchor, { id, getValue, setValue, onCommit }) {
   if (!anchor) return;
   // Dynamic import avoids a circular dependency with history.js (backup uses todos).
-  const { toggleCustomDatePicker } = await import("./history.js?v=140");
+  const { toggleCustomDatePicker } = await import("./history.js?v=187");
   toggleCustomDatePicker({ id, getValue, setValue, onCommit, anchor });
 }
 
@@ -197,6 +200,8 @@ function normalizeTask(raw) {
     .map(normalizeStep)
     .filter(Boolean)
     .slice(0, MAX_TODO_STEPS);
+  const workedSeconds = Math.max(0, Math.floor(Number(raw.workedSeconds) || 0));
+  const timerStartedAt = raw.timerStartedAt ? String(raw.timerStartedAt) : null;
   return {
     id: String(raw.id || uid("task")),
     listId: String(raw.listId || ""),
@@ -206,6 +211,9 @@ function normalizeTask(raw) {
     completedAt: raw.completedAt ? String(raw.completedAt) : null,
     dueDate: raw.dueDate ? String(raw.dueDate).slice(0, 10) : null,
     myDayDate: raw.myDayDate ? String(raw.myDayDate).slice(0, 10) : null,
+    workedSeconds,
+    timerStartedAt,
+    timerUsed: Boolean(raw.timerUsed) || workedSeconds > 0 || Boolean(timerStartedAt),
     steps,
     sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Number(raw.sortOrder) : Date.now()
   };
@@ -291,7 +299,7 @@ function findTask(id) {
   return doc().tasks.find((t) => t.id === id) || null;
 }
 
-function findList(id) {
+export function findList(id) {
   return doc().lists.find((l) => l.id === id) || null;
 }
 
@@ -303,8 +311,107 @@ export function isOverdue(task, day = todayKey()) {
   return Boolean(task?.dueDate && !task.completedAt && task.dueDate < day);
 }
 
+/** Active work seconds (accumulated + current running segment). */
+export function activeWorkSeconds(task, now = Date.now()) {
+  const base = Math.max(0, Math.floor(Number(task?.workedSeconds) || 0));
+  if (!task?.timerStartedAt) return base;
+  const start = Date.parse(task.timerStartedAt);
+  if (!Number.isFinite(start) || start > now) return base;
+  return base + Math.max(0, Math.floor((now - start) / 1000));
+}
+
+function flushTaskTimer(task, now = Date.now()) {
+  if (!task?.timerStartedAt) return false;
+  task.workedSeconds = activeWorkSeconds(task, now);
+  task.timerStartedAt = null;
+  return true;
+}
+
+function anyRunningTodoTimer() {
+  return doc().tasks.some((t) => t.timerStartedAt && !t.completedAt);
+}
+
+function stopTodoTimerTick() {
+  if (todoTimerTickId) {
+    clearInterval(todoTimerTickId);
+    todoTimerTickId = null;
+  }
+}
+
+function updateRunningTimerLabels() {
+  document.querySelectorAll("[data-todo-timer-label]").forEach((el) => {
+    const task = findTask(el.dataset.todoTimerLabel);
+    if (!task?.timerStartedAt || task.completedAt) return;
+    el.textContent = `Working ${formatDuration(activeWorkSeconds(task))}`;
+  });
+}
+
+/** Keep a 1s tick while To-Do is open and a timer is running. */
+export function syncTodoTimerTick() {
+  if (state.activeScreen === "todos-screen" && anyRunningTodoTimer()) {
+    if (!todoTimerTickId) {
+      todoTimerTickId = setInterval(() => {
+        if (state.activeScreen !== "todos-screen" || !anyRunningTodoTimer()) {
+          stopTodoTimerTick();
+          return;
+        }
+        updateRunningTimerLabels();
+      }, 1000);
+    }
+    return;
+  }
+  stopTodoTimerTick();
+}
+
+export function pauseTaskTimer(id, { render = true } = {}) {
+  const task = findTask(id);
+  if (!task || task.completedAt || !task.timerStartedAt) return false;
+  flushTaskTimer(task);
+  saveTodos();
+  if (render) renderTodos();
+  else syncTodoTimerTick();
+  return true;
+}
+
+/** Start or resume a task timer. Only one task may run at a time. */
+export function startTaskTimer(id, { render = true } = {}) {
+  const task = findTask(id);
+  if (!task || task.completedAt) return false;
+  const now = Date.now();
+  doc().tasks.forEach((other) => {
+    if (other.id !== id && other.timerStartedAt) flushTaskTimer(other, now);
+  });
+  if (!task.timerStartedAt) {
+    task.timerUsed = true;
+    task.timerStartedAt = new Date(now).toISOString();
+  }
+  saveTodos();
+  if (render) renderTodos();
+  else syncTodoTimerTick();
+  return true;
+}
+
+/** Open (incomplete) tasks for session linking on Setup. */
+export function listOpenTasksForSetup() {
+  return doc().tasks
+    .filter((t) => !t.completedAt)
+    .slice()
+    .sort((a, b) => {
+      const aMy = isMyDay(a) ? 0 : 1;
+      const bMy = isMyDay(b) ? 0 : 1;
+      if (aMy !== bMy) return aMy - bMy;
+      return String(a.title).localeCompare(String(b.title));
+    });
+}
+
 export function completionDurationLabel(task) {
-  if (!task?.completedAt || !task?.createdAt) return null;
+  if (!task?.completedAt) return null;
+  const tracked = activeWorkSeconds(task);
+  if (tracked > 0 || task.timerUsed) {
+    return formatDuration(tracked);
+  }
+  // Legacy: wall-clock for tasks completed before work timers existed.
+  if (!task.createdAt) return null;
   const start = Date.parse(task.createdAt);
   const end = Date.parse(task.completedAt);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
@@ -370,6 +477,25 @@ export function setActiveTodoList(id) {
   renderTodos();
 }
 
+function listNameTaken(name, excludeId = null) {
+  const needle = String(name || "").trim().toLowerCase();
+  if (!needle) return false;
+  return doc().lists.some((l) => l.id !== excludeId && String(l.name || "").trim().toLowerCase() === needle);
+}
+
+/** Ensure list names stay unique: "Test" → "Test 2", "Test 3", … */
+export function uniqueListName(desired, excludeId = null) {
+  const base = String(desired || "").trim().slice(0, 60) || "New list";
+  if (!listNameTaken(base, excludeId)) return base;
+  for (let n = 2; n < 1000; n += 1) {
+    const suffix = ` ${n}`;
+    const maxBase = Math.max(1, 60 - suffix.length);
+    const candidate = `${base.slice(0, maxBase)}${suffix}`;
+    if (!listNameTaken(candidate, excludeId)) return candidate;
+  }
+  return `${base.slice(0, 48)} ${Date.now().toString(36)}`.slice(0, 60);
+}
+
 export function addTodoList(name = "New list") {
   const d = doc();
   if (d.lists.length >= MAX_TODO_LISTS) {
@@ -378,7 +504,7 @@ export function addTodoList(name = "New list") {
   }
   const list = normalizeList({
     id: uid("list"),
-    name: String(name || "New list").trim().slice(0, 60) || "New list",
+    name: uniqueListName(name || "New list"),
     color: LIST_COLORS[d.lists.length % LIST_COLORS.length],
     sortOrder: Date.now()
   });
@@ -393,12 +519,21 @@ export function addTodoList(name = "New list") {
 export function renameTodoList(id, name) {
   const list = findList(id);
   if (!list) return false;
-  const next = String(name || "").trim().slice(0, 60);
-  if (!next) return false;
+  // Empty input falls back to the default label (placeholder behavior).
+  const next = uniqueListName(String(name || "").trim().slice(0, 60) || "New list", id);
+  if (list.name === next) return true;
   list.name = next;
   saveTodos();
   renderTodos();
   return true;
+}
+
+function focusNewListTitleInput() {
+  const input = document.getElementById("todos-list-title-input");
+  if (!input) return;
+  input.focus();
+  // Select the default name so the first keystroke replaces it like a placeholder.
+  input.select();
 }
 
 export function setTodoListColor(id, color) {
@@ -483,7 +618,9 @@ export function toggleTaskComplete(id) {
   if (!task) return false;
   if (task.completedAt) {
     task.completedAt = null;
+    // Leave workedSeconds as-is; timer stays paused until Start again.
   } else {
+    flushTaskTimer(task);
     task.completedAt = new Date().toISOString();
   }
   saveTodos();
@@ -638,19 +775,26 @@ function renderRail() {
   `;
 }
 
-function priorityLabel(priority) {
-  return { low: "Low", medium: "Med", high: "High" }[priority] || "Med";
-}
-
-function nextPriority(priority) {
-  const order = ["low", "medium", "high"];
-  const i = order.indexOf(normalizePriority(priority));
-  return order[(i + 1) % order.length];
-}
-
-function priorityToggleHtml({ priority, attrs = "", disabled = false }) {
+function prioritySelectHtml({ priority, selectId = "", taskId = "", disabled = false } = {}) {
   const p = normalizePriority(priority);
-  return `<button type="button" class="todo-action-btn todo-priority-btn is-${p}" ${attrs} aria-label="Priority ${priorityLabel(p)}. Click to change" title="Change priority (now ${priorityLabel(p)})" ${disabled ? "disabled" : ""}><span class="todo-action-label">Priority</span><span class="todo-action-value">${priorityLabel(p)}</span><span class="todo-action-caret" aria-hidden="true">▾</span></button>`;
+  const idAttr = selectId ? ` id="${selectId}"` : "";
+  const taskAttr = taskId ? ` data-todo-priority="${taskId}"` : "";
+  const opts = [
+    ["low", "Low"],
+    ["medium", "Med"],
+    ["high", "High"]
+  ];
+  return `
+    <label class="todo-action-btn todo-priority-field is-${p}">
+      <span class="todo-action-label">Priority</span>
+      <select class="todo-priority-select"${idAttr}${taskAttr} aria-label="Priority" ${disabled ? "disabled" : ""}>
+        ${opts.map(([value, label]) => `
+          <option value="${value}" ${p === value ? "selected" : ""}>${label}</option>
+        `).join("")}
+      </select>
+      <span class="todo-action-caret" aria-hidden="true">▾</span>
+    </label>
+  `;
 }
 
 function dueTriggerHtml({
@@ -671,6 +815,24 @@ function dueTriggerHtml({
   return `<button type="button" class="todo-action-btn date-field-trigger todo-due-trigger"${btnIdAttr}${taskAttr} ${extraAttrs} data-date-picker-anchor aria-haspopup="dialog" aria-expanded="false" aria-label="${label}" title="${label}" ${disabled ? "disabled" : ""}><span class="todo-action-label">Due</span><span class="todo-action-value ${has ? "" : "is-empty"} ${overdue ? "is-overdue" : ""}"${valueIdAttr}${valueDataAttr}>${escapeHtml(dueLabel(dueDate, { empty: "Add date" }))}</span><span class="todo-action-caret" aria-hidden="true">▾</span></button>`;
 }
 
+function taskTimerControlsHtml(task) {
+  if (task.completedAt) return "";
+  const running = Boolean(task.timerStartedAt);
+  const accrued = activeWorkSeconds(task);
+  const accruedLabel = accrued > 0 ? formatDuration(accrued) : "";
+  if (running) {
+    return `
+      <span class="todo-chip todo-chip-working" data-todo-timer-label="${task.id}">Working ${escapeHtml(formatDuration(accrued))}</span>
+      <button type="button" class="todo-chip todo-chip-timer is-running" data-todo-timer="pause" data-todo-timer-id="${task.id}" aria-label="Pause work timer">Pause</button>
+    `;
+  }
+  const label = accruedLabel ? `Resume · ${accruedLabel}` : "Start";
+  const aria = accruedLabel ? `Resume work timer (${accruedLabel} so far)` : "Start work timer";
+  return `
+    <button type="button" class="todo-chip todo-chip-timer" data-todo-timer="start" data-todo-timer-id="${task.id}" aria-label="${escapeHtml(aria)}">${escapeHtml(label)}</button>
+  `;
+}
+
 function renderTaskRow(task) {
   const day = todayKey();
   const expanded = expandedTaskIds.has(task.id);
@@ -679,7 +841,7 @@ function renderTaskRow(task) {
   const stepsDone = task.steps.filter((s) => s.completedAt).length;
   const list = findList(task.listId);
   return `
-    <article class="todo-task ${task.completedAt ? "is-completed" : ""} ${overdue ? "is-overdue" : ""}" data-task-id="${task.id}">
+    <article class="todo-task ${task.completedAt ? "is-completed" : ""} ${overdue ? "is-overdue" : ""} ${task.timerStartedAt ? "is-timing" : ""}" data-task-id="${task.id}">
       <div class="todo-task-main">
         <label class="todo-check">
           <input type="checkbox" data-todo-complete="${task.id}" ${task.completedAt ? "checked" : ""} aria-label="Mark complete">
@@ -693,15 +855,16 @@ function renderTaskRow(task) {
             ${task.completedAt
               ? `<span class="todo-chip">Done ${escapeHtml(dueLabel(localDayKey(task.completedAt), { empty: "" }))}</span>` : ""}
             ${took ? `<span class="todo-chip todo-chip-took">Took ${escapeHtml(took)}</span>` : ""}
+            ${taskTimerControlsHtml(task)}
             <button type="button" class="todo-chip todo-chip-steps ${expanded ? "is-open" : ""}" data-todo-expand="${task.id}" aria-expanded="${expanded}">
               ${task.steps.length ? `${stepsDone}/${task.steps.length} steps` : "+ Steps"}
             </button>
           </div>
         </div>
         <div class="todo-task-actions">
-          ${priorityToggleHtml({
+          ${prioritySelectHtml({
             priority: task.priority,
-            attrs: `data-todo-priority="${task.id}"`,
+            taskId: task.id,
             disabled: Boolean(task.completedAt)
           })}
           ${dueTriggerHtml({
@@ -759,7 +922,7 @@ function renderMain() {
     <header class="todos-main-header" style="--todo-list-accent:${meta.color}">
       <div class="todos-main-heading">
         ${meta.editable
-          ? `<input class="todos-list-title-input" id="todos-list-title-input" value="${escapeHtml(meta.title)}" maxlength="60" aria-label="List name">`
+          ? `<input class="todos-list-title-input" id="todos-list-title-input" value="${escapeHtml(meta.title)}" maxlength="60" placeholder="New list" aria-label="List name" autocomplete="off" spellcheck="false">`
           : `<h2 id="todos-main-title">${escapeHtml(meta.title)}</h2>`}
         <p class="local-data-note">${escapeHtml(meta.subtitle)}</p>
       </div>
@@ -783,7 +946,7 @@ function renderMain() {
         <input id="todos-add-input" type="text" maxlength="200" placeholder="What needs doing?" aria-label="New task title" required autocomplete="off">
       </div>
       <div class="todos-add-tools">
-        ${priorityToggleHtml({ priority: addDraft.priority, attrs: 'id="todos-add-priority"' })}
+        ${prioritySelectHtml({ priority: addDraft.priority, selectId: "todos-add-priority" })}
         ${dueTriggerHtml({
           dueDate: addDraft.dueDate,
           buttonId: "todos-add-due-btn",
@@ -829,6 +992,7 @@ export function renderTodos() {
   if (!state.todos) loadTodos();
   renderRail();
   renderMain();
+  syncTodoTimerTick();
 }
 
 const SETUP_PREVIEW_SMART = new Set(["focus", "myday", "important", "overdue", "open"]);
@@ -967,12 +1131,13 @@ export function renderSetupTodosWidget() {
         return `
           <div class="setup-todos-row ${overdue ? "is-overdue" : ""}">
             <button type="button" class="setup-todos-row-check" data-setup-todo-complete="${task.id}" aria-label="Complete ${escapeHtml(task.title)}"></button>
-            <button type="button" class="setup-todos-row-open" data-setup-todo-open="${task.id}" aria-label="Open ${escapeHtml(task.title)} in To-Do">
+            <button type="button" class="setup-todos-row-focus" data-setup-todo-focus="${task.id}" aria-label="Focus on ${escapeHtml(task.title)}">
               <span class="setup-todos-row-copy">
                 <strong>${escapeHtml(task.title)}</strong>
-                <span>${label}</span>
+                <span>${label} · tap to focus</span>
               </span>
             </button>
+            <button type="button" class="setup-todos-row-open" data-setup-todo-open="${task.id}" aria-label="Open ${escapeHtml(task.title)} in To-Do" title="Open in To-Do">↗</button>
           </div>
         `;
       }).join("");
@@ -1036,6 +1201,21 @@ export function bindTodoEvents() {
         toggleTaskComplete(completeBtn.dataset.setupTodoComplete);
         return;
       }
+      const focusTask = event.target.closest("[data-setup-todo-focus]");
+      if (focusTask) {
+        event.preventDefault();
+        const id = focusTask.dataset.setupTodoFocus;
+        import("./setup.js?v=187").then(({ linkTodoToSetup }) => {
+          if (linkTodoToSetup(id)) {
+            showToast("To-do linked to your focus goal.");
+            dom.taskIntent?.focus();
+            dom.setupForm?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+          } else {
+            showToast("That to-do is no longer open.");
+          }
+        });
+        return;
+      }
       const openTask = event.target.closest("[data-setup-todo-open]");
       if (openTask) {
         openTaskInTodos(openTask.dataset.setupTodoOpen);
@@ -1060,7 +1240,7 @@ export function bindTodoEvents() {
     }
     if (event.target.closest("#todos-new-list-btn")) {
       addTodoList("New list");
-      queueMicrotask(() => document.getElementById("todos-list-title-input")?.focus());
+      queueMicrotask(focusNewListTitleInput);
       return;
     }
     if (event.target.closest("#todos-delete-list-btn")) {
@@ -1097,20 +1277,6 @@ export function bindTodoEvents() {
       });
       return;
     }
-    if (event.target.closest("#todos-add-priority")) {
-      addDraft.priority = nextPriority(addDraft.priority);
-      syncAddFormDraft();
-      return;
-    }
-    const priorityBtn = event.target.closest("[data-todo-priority]");
-    if (priorityBtn) {
-      const task = findTask(priorityBtn.dataset.todoPriority);
-      if (task && !task.completedAt) {
-        const next = nextPriority(task.priority);
-        setTaskPriority(task.id, next);
-      }
-      return;
-    }
     if (event.target.closest("#todos-add-clear")) {
       resetAddDraft();
       const input = document.getElementById("todos-add-input");
@@ -1138,6 +1304,13 @@ export function bindTodoEvents() {
         setValue: (iso) => { setTaskDueDate(taskId, iso || null); },
         onCommit: () => {}
       });
+      return;
+    }
+    const timerBtn = event.target.closest("[data-todo-timer]");
+    if (timerBtn) {
+      const id = timerBtn.dataset.todoTimerId;
+      if (timerBtn.dataset.todoTimer === "pause") pauseTaskTimer(id);
+      else startTaskTimer(id);
       return;
     }
     const expandBtn = event.target.closest("[data-todo-expand]");
@@ -1184,6 +1357,19 @@ export function bindTodoEvents() {
       toggleStep(stepComplete.dataset.todoStepComplete, stepComplete.dataset.stepId);
       return;
     }
+    if (event.target.id === "todos-add-priority") {
+      addDraft.priority = normalizePriority(event.target.value);
+      syncAddFormDraft();
+      return;
+    }
+    const prioritySelect = event.target.closest("[data-todo-priority]");
+    if (prioritySelect) {
+      const task = findTask(prioritySelect.dataset.todoPriority);
+      if (task && !task.completedAt) {
+        setTaskPriority(task.id, prioritySelect.value);
+      }
+      return;
+    }
     if (event.target.id === "todos-completed-date") {
       completedFilters.date = event.target.value || "all";
       if (completedFilters.date !== "custom") completedFilters.customDate = null;
@@ -1228,6 +1414,15 @@ export function bindTodoEvents() {
       const text = String(input?.value || "").trim();
       if (!text) return;
       addStep(stepForm.dataset.todoStepForm, text);
+    }
+  });
+
+  screen.addEventListener("focusin", (event) => {
+    const listTitle = event.target.closest("#todos-list-title-input");
+    if (!listTitle) return;
+    // Default name behaves like a placeholder: highlight so typing replaces it.
+    if (listTitle.value.trim() === "New list") {
+      queueMicrotask(() => listTitle.select());
     }
   });
 
