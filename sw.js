@@ -1,6 +1,6 @@
 /* Locked-In service worker — network-first HTML, cache-first static assets. */
-const CACHE = "locked-in-v62";
-const ASSET_V = "78";
+const CACHE = "locked-in-v92";
+const ASSET_V = "140";
 const PRECACHE = [
   "./",
   "./index.html",
@@ -15,6 +15,8 @@ const PRECACHE = [
   `./css/history.css?v=${ASSET_V}`,
   `./css/insights.css?v=${ASSET_V}`,
   `./css/notes.css?v=${ASSET_V}`,
+  `./css/todos.css?v=${ASSET_V}`,
+  `./css/customize.css?v=${ASSET_V}`,
   `./app.js?v=${ASSET_V}`,
   `./js/constants.js?v=${ASSET_V}`,
   `./js/runtime.js?v=${ASSET_V}`,
@@ -28,6 +30,9 @@ const PRECACHE = [
   `./js/history.js?v=${ASSET_V}`,
   `./js/insights.js?v=${ASSET_V}`,
   `./js/notes.js?v=${ASSET_V}`,
+  `./js/todos.js?v=${ASSET_V}`,
+  `./js/week-reports.js?v=${ASSET_V}`,
+  `./js/customize.js?v=${ASSET_V}`,
   `./js/bind.js?v=${ASSET_V}`,
   "./assets/favicon.svg",
   "./assets/icon-192.png",

@@ -1,14 +1,15 @@
-import { HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES } from "./constants.js?v=78";
-import { dom, state, tabId } from "./runtime.js?v=78";
-import { safeWrite } from "./storage.js?v=78";
-import { showToast } from "./toast.js?v=78";
-import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, toISODateLocal } from "./utils.js?v=78";
-import { broadcast } from "./sync.js?v=78";
-import { askConfirm, navigate } from "./theme-nav.js?v=78";
-import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=78";
-import { renderInsights } from "./insights.js?v=78";
-import { applyNoteItems, createNoteItemOptions, deleteEditedNote, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, sessionNoteItems } from "./notes.js?v=78";
-import { renderAll } from "./bind.js?v=78";
+import { HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES } from "./constants.js?v=140";
+import { dom, state, tabId } from "./runtime.js?v=140";
+import { safeWrite } from "./storage.js?v=140";
+import { showToast } from "./toast.js?v=140";
+import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, toISODateLocal } from "./utils.js?v=140";
+import { broadcast } from "./sync.js?v=140";
+import { askConfirm, navigate } from "./theme-nav.js?v=140";
+import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=140";
+import { renderInsights } from "./insights.js?v=140";
+import { applyNoteItems, createNoteItemOptions, createNoteOptionsMenu, deleteEditedNote, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, sessionNoteItems } from "./notes.js?v=140";
+import { normalizeTodosDoc, saveTodos } from "./todos.js?v=140";
+import { renderAll } from "./bind.js?v=140";
 
 export function liveSessionAsHistoryRow(now = Date.now()) {
   const s = state.session;
@@ -94,6 +95,35 @@ export function clearHistoryFilters() {
   showToast("Filters cleared.");
 }
 
+/** Jump to History filtered to a single local day (YYYY-MM-DD). */
+export function openHistoryForDay(dayKey) {
+  const key = String(dayKey || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+  if (state.datePicker.field) closeDatePicker({ restoreFocus: false });
+  if (dom.historySearch) dom.historySearch.value = "";
+  if (dom.historyTagFilter) dom.historyTagFilter.value = "";
+  if (dom.historySort) dom.historySort.value = "newest";
+  if (dom.historyDateFrom) dom.historyDateFrom.value = key;
+  if (dom.historyDateTo) dom.historyDateTo.value = key;
+  syncAllDateDisplays();
+  navigate("history-screen");
+  renderHistory();
+  const label = formatShortDate(key);
+  const count = getFilteredHistory().filter((r) => !r.live).length;
+  showToast(
+    count
+      ? `${count} session${count === 1 ? "" : "s"} on ${label}.`
+      : `No sessions on ${label}.`
+  );
+  requestAnimationFrame(() => {
+    dom.historyTableBody?.scrollIntoView({
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start"
+    });
+  });
+  return true;
+}
+
 export function getDatePickerFocusables() {
   if (!dom.datePickerPopover) return [];
   return [...dom.datePickerPopover.querySelectorAll("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])")]
@@ -115,23 +145,56 @@ export function trapDatePickerFocus(event) {
   }
 }
 
+function datePickerSelectedValue() {
+  const custom = state.datePicker.custom;
+  if (custom && state.datePicker.field === custom.id) {
+    return String(custom.getValue?.() || "");
+  }
+  return state.datePicker.field === "from" ? dom.historyDateFrom?.value : dom.historyDateTo?.value;
+}
+
+function datePickerAnchor() {
+  const custom = state.datePicker.custom;
+  if (custom && state.datePicker.field === custom.id) return custom.anchor || null;
+  return state.datePicker.field === "from" ? dom.historyDateFromBtn : dom.historyDateToBtn;
+}
+
+function syncDatePickerExpanded() {
+  const anchor = datePickerAnchor();
+  [dom.historyDateFromBtn, dom.historyDateToBtn].forEach((btn) => {
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  });
+  document.querySelectorAll("[data-date-picker-anchor]").forEach((btn) => {
+    btn.setAttribute("aria-expanded", btn === anchor ? "true" : "false");
+  });
+  if (anchor && (anchor === dom.historyDateFromBtn || anchor === dom.historyDateToBtn)) {
+    anchor.setAttribute("aria-expanded", "true");
+  }
+}
+
 export function closeDatePicker({ restoreFocus = true } = {}) {
   if (!dom.datePickerPopover) return;
   dom.datePickerPopover.hidden = true;
   dom.datePickerPopover.classList.add("is-hidden");
   const field = state.datePicker.field;
   const previousFocus = state.datePicker.previousFocus;
+  const custom = state.datePicker.custom;
   state.datePicker.field = null;
   state.datePicker.previousFocus = null;
+  state.datePicker.custom = null;
   [dom.historyDateFromBtn, dom.historyDateToBtn].forEach((btn) => {
     if (btn) btn.setAttribute("aria-expanded", "false");
+  });
+  document.querySelectorAll("[data-date-picker-anchor]").forEach((btn) => {
+    btn.setAttribute("aria-expanded", "false");
   });
   if (!restoreFocus) return;
   if (previousFocus && typeof previousFocus.focus === "function" && document.contains(previousFocus)) {
     previousFocus.focus();
     return;
   }
-  if (field === "from") dom.historyDateFromBtn?.focus();
+  if (custom?.anchor && document.contains(custom.anchor)) custom.anchor.focus();
+  else if (field === "from") dom.historyDateFromBtn?.focus();
   else if (field === "to") dom.historyDateToBtn?.focus();
 }
 
@@ -153,8 +216,8 @@ export function positionDatePicker(anchor) {
 
 export function renderDatePicker() {
   if (!dom.datePickerGrid || !dom.datePickerTitle) return;
-  const { viewYear, viewMonth, field } = state.datePicker;
-  const selected = field === "from" ? dom.historyDateFrom?.value : dom.historyDateTo?.value;
+  const { viewYear, viewMonth } = state.datePicker;
+  const selected = datePickerSelectedValue();
   const titleDate = new Date(viewYear, viewMonth, 1);
   dom.datePickerTitle.textContent = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(titleDate);
 
@@ -186,6 +249,13 @@ export function renderDatePicker() {
 export function selectDatePickerDay(iso) {
   const field = state.datePicker.field;
   if (!field) return;
+  const custom = state.datePicker.custom;
+  if (custom && field === custom.id) {
+    custom.setValue?.(iso);
+    closeDatePicker();
+    custom.onCommit?.(iso);
+    return;
+  }
   const input = field === "from" ? dom.historyDateFrom : dom.historyDateTo;
   if (!input) return;
   input.value = iso;
@@ -202,12 +272,40 @@ export function selectDatePickerDay(iso) {
   renderHistory();
 }
 
+export function openCustomDatePicker({ id, getValue, setValue, onCommit, anchor }) {
+  if (!dom.datePickerPopover || !anchor) return;
+  const raw = String(getValue?.() || "");
+  const current = raw ? new Date(`${raw}T00:00:00`) : new Date();
+  state.datePicker.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : anchor;
+  state.datePicker.custom = { id, getValue, setValue, onCommit, anchor };
+  state.datePicker.field = id;
+  state.datePicker.viewYear = Number.isNaN(current.getTime()) ? new Date().getFullYear() : current.getFullYear();
+  state.datePicker.viewMonth = Number.isNaN(current.getTime()) ? new Date().getMonth() : current.getMonth();
+  renderDatePicker();
+  dom.datePickerPopover.hidden = false;
+  dom.datePickerPopover.classList.remove("is-hidden");
+  positionDatePicker(anchor);
+  syncDatePickerExpanded();
+  const focusTarget = dom.datePickerGrid?.querySelector(".date-picker-day.is-selected, .date-picker-day.is-today, .date-picker-day")
+    || getDatePickerFocusables()[0];
+  focusTarget?.focus();
+}
+
+export function toggleCustomDatePicker(opts) {
+  if (state.datePicker.field === opts.id && !dom.datePickerPopover?.hidden) {
+    closeDatePicker();
+    return;
+  }
+  openCustomDatePicker(opts);
+}
+
 export function openDatePicker(field) {
   if (!dom.datePickerPopover) return;
   const input = field === "from" ? dom.historyDateFrom : dom.historyDateTo;
   const anchor = field === "from" ? dom.historyDateFromBtn : dom.historyDateToBtn;
   const current = input?.value ? new Date(`${input.value}T00:00:00`) : new Date();
   state.datePicker.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : anchor;
+  state.datePicker.custom = null;
   state.datePicker.field = field;
   state.datePicker.viewYear = current.getFullYear();
   state.datePicker.viewMonth = current.getMonth();
@@ -215,9 +313,7 @@ export function openDatePicker(field) {
   dom.datePickerPopover.hidden = false;
   dom.datePickerPopover.classList.remove("is-hidden");
   positionDatePicker(anchor);
-  [dom.historyDateFromBtn, dom.historyDateToBtn].forEach((btn) => {
-    if (btn) btn.setAttribute("aria-expanded", btn === anchor ? "true" : "false");
-  });
+  syncDatePickerExpanded();
   const focusTarget = dom.datePickerGrid?.querySelector(".date-picker-day.is-selected, .date-picker-day.is-today, .date-picker-day")
     || getDatePickerFocusables()[0];
   focusTarget?.focus();
@@ -256,6 +352,13 @@ export function initDatePickers() {
   dom.datePickerClear?.addEventListener("click", () => {
     const field = state.datePicker.field;
     if (!field) return;
+    const custom = state.datePicker.custom;
+    if (custom && field === custom.id) {
+      custom.setValue?.("");
+      closeDatePicker();
+      custom.onCommit?.(null);
+      return;
+    }
     const input = field === "from" ? dom.historyDateFrom : dom.historyDateTo;
     if (input) input.value = "";
     syncDateFieldDisplay(field);
@@ -271,6 +374,9 @@ export function initDatePickers() {
     if (!(target instanceof Node)) return;
     if (dom.datePickerPopover.contains(target)) return;
     if (dom.historyDateFromBtn?.contains(target) || dom.historyDateToBtn?.contains(target)) return;
+    const customAnchor = state.datePicker.custom?.anchor;
+    if (customAnchor?.contains?.(target)) return;
+    if (target instanceof Element && target.closest("[data-date-picker-anchor]")) return;
     closeDatePicker();
   });
   document.addEventListener("keydown", (event) => {
@@ -284,8 +390,7 @@ export function initDatePickers() {
   });
   window.addEventListener("resize", () => {
     if (!state.datePicker.field) return;
-    const anchor = state.datePicker.field === "from" ? dom.historyDateFromBtn : dom.historyDateToBtn;
-    positionDatePicker(anchor);
+    positionDatePicker(datePickerAnchor());
   }, { passive: true });
 }
 
@@ -365,33 +470,33 @@ export function initHistoryTableScrollHint() {
 
 export function syncLiveHistoryRow(now = Date.now()) {
   if (state.activeScreen !== "history-screen" || !state.session) return;
-  const tr = dom.historyTableBody?.querySelector("tr.is-live-session");
-  if (!tr) return;
+  const card = dom.historyTableBody?.querySelector(".history-session.is-live-session");
+  if (!card) return;
   const live = liveSessionAsHistoryRow(now);
   if (!live) return;
   const b = scoreBreakdown(live);
-  const focusTd = tr.querySelector('[data-label="Focus"]');
-  const elapsedTd = tr.querySelector('[data-label="Elapsed"]');
-  const scoreTd = tr.querySelector('[data-label="Completion score"]');
-  const pill = tr.querySelector(".outcome-pill");
-  if (focusTd) {
-    focusTd.textContent = formatDuration(live.focusSeconds);
-    focusTd.title = `Active focus so far: ${formatDuration(live.focusSeconds)} of ${formatDuration(live.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`;
+  const focusEl = card.querySelector("[data-history-focus]");
+  const elapsedEl = card.querySelector("[data-history-elapsed]");
+  const scoreEl = card.querySelector("[data-history-score]");
+  const pill = card.querySelector(".outcome-pill");
+  if (focusEl) {
+    focusEl.textContent = formatDuration(live.focusSeconds);
+    focusEl.title = `Active focus so far: ${formatDuration(live.focusSeconds)} of ${formatDuration(live.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`;
   }
-  if (elapsedTd) {
-    elapsedTd.textContent = formatDuration(live.elapsedSeconds);
-    elapsedTd.title = `Clock time so far including breaks: ${formatDuration(live.elapsedSeconds)} (breaks ${formatDuration(live.breakSeconds)}).`;
+  if (elapsedEl) {
+    elapsedEl.textContent = formatDuration(live.elapsedSeconds);
+    elapsedEl.title = `Clock time so far including breaks: ${formatDuration(live.elapsedSeconds)} (breaks ${formatDuration(live.breakSeconds)}).`;
   }
-  if (scoreTd) {
-    scoreTd.textContent = "—";
-    scoreTd.title = "Score is calculated when the session ends.";
+  if (scoreEl) {
+    scoreEl.textContent = "—";
+    scoreEl.title = "Score is calculated when the session ends.";
   }
   if (pill) {
-    pill.textContent = "In progress";
+    pill.textContent = "Live";
     pill.title = live.reason === "On break"
       ? "Session is active — currently on a break."
       : "Session is active — focusing now.";
-    pill.setAttribute("aria-label", pill.title);
+    pill.setAttribute("aria-label", `${pill.textContent}. ${pill.title}`);
   }
 }
 
@@ -400,122 +505,154 @@ export function renderHistory() {
   const rows = getFilteredHistory();
   dom.historyTableBody.replaceChildren();
   rows.forEach((r) => {
-    const tr = document.createElement("tr");
-    if (r.live) tr.classList.add("is-live-session");
     const score = r.live ? null : scoreFor(r);
     const b = scoreBreakdown(r);
     const noteItems = sessionNoteItems(r);
-    const cells = [
-      {
-        label: "Date",
-        text: formatDate(r.completedAt),
-        title: r.live ? `Started ${formatDate(r.completedAt)}.` : `Saved ${formatDate(r.completedAt)}.`
-      },
-      { label: "Goal", text: r.intent, title: "Focus goal for this session." },
-      { label: "Tag", text: r.tag || "—", title: r.tag ? `Tag: ${r.tag}.` : "No tag for this session." },
-      { label: "Topics", text: r.topic || "—", title: r.topic ? "Topics / work tagged for this session." : "No topics saved for this session." },
-      {
-        label: "Focus",
-        text: formatDuration(r.focusSeconds),
-        title: r.live
-          ? `Active focus so far: ${formatDuration(r.focusSeconds)} of ${formatDuration(r.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`
-          : `Active focus time: ${formatDuration(r.focusSeconds)} of ${formatDuration(r.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`
-      },
-      {
-        label: "Elapsed",
-        text: formatDuration(r.elapsedSeconds),
-        title: r.live
-          ? `Clock time so far including breaks: ${formatDuration(r.elapsedSeconds)} (breaks ${formatDuration(r.breakSeconds)}).`
-          : `Total clock time including breaks: ${formatDuration(r.elapsedSeconds)} (breaks ${formatDuration(r.breakSeconds)}).`
-      },
-      {
-        label: "Completion score",
-        text: r.live ? "—" : score == null ? "N/A" : `${score}%`,
-        title: r.live ? "Score is calculated when the session ends." : explainScore(r),
-        explain: !r.live
-      }
-    ];
-    cells.forEach((cell) => {
-      const td = document.createElement("td");
-      td.textContent = cell.text;
-      td.dataset.label = cell.label;
-      td.title = cell.title;
-      if (cell.explain) {
-        td.tabIndex = 0;
-        td.setAttribute("aria-label", `${cell.label}: ${cell.text}. ${cell.title}`);
-      }
-      tr.append(td);
-    });
-    const notesTd = document.createElement("td");
-    notesTd.dataset.label = "Notes";
-    notesTd.className = "history-notes-cell";
-    if (!noteItems.length) {
-      notesTd.textContent = "—";
-      notesTd.title = r.live ? "No notes yet for this active session." : "No notes saved for this session.";
-    } else {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "history-notes-btn";
-      const preview = noteItems[0].text.replace(/\s+/g, " ").trim();
-      const short = preview.length > 48 ? `${preview.slice(0, 48)}…` : preview;
-      const count = document.createElement("strong");
-      count.textContent = noteItems.length === 1 ? "1 note" : `${noteItems.length} notes`;
-      const snippet = document.createElement("span");
-      snippet.textContent = short;
-      btn.append(count, snippet);
-      btn.title = noteItems.map((n, i) => `Note ${i + 1}: ${n.text}`).join("\n\n");
-      btn.setAttribute("aria-label", `${noteItems.length} note${noteItems.length === 1 ? "" : "s"} for ${r.intent}. Open in Notes with filter.`);
-      btn.addEventListener("click", () => openNotesFilteredToSession(r.id));
-      notesTd.append(btn);
-    }
-    const focusTd = tr.children[4];
-    tr.insertBefore(notesTd, focusTd);
-    const out = document.createElement("td");
-    out.dataset.label = "Outcome";
+    const card = document.createElement("article");
+    card.className = `history-session${r.live ? " is-live-session" : ""}`;
+    card.dataset.sessionId = r.id;
+    card.setAttribute("role", "listitem");
+
+    const main = document.createElement("div");
+    main.className = "history-session-main";
+
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "history-session-title-wrap";
+    const title = document.createElement("h3");
+    title.className = "history-session-title";
+    title.textContent = r.intent;
+    title.title = "Focus goal for this session.";
+    titleWrap.append(title);
+
+    const actions = document.createElement("div");
+    actions.className = "history-session-actions";
     const pill = document.createElement("span");
     if (r.live) {
       pill.className = "outcome-pill active";
-      pill.textContent = "In progress";
+      pill.textContent = "Live";
       pill.title = r.reason === "On break"
         ? "Session is active — currently on a break."
         : "Session is active — focusing now.";
     } else {
       pill.className = `outcome-pill ${r.outcome === "completed" ? "success" : r.outcome === "failed" ? "failed" : ""}`;
-      pill.textContent = r.outcome === "completed" ? "Completed" : r.outcome === "failed" ? "Hardcore failed" : r.outcome === "incomplete" ? "Incomplete" : "Ended early";
+      pill.textContent = r.outcome === "completed" ? "Done" : r.outcome === "failed" ? "Failed" : r.outcome === "incomplete" ? "Incomplete" : "Early";
       pill.title = explainOutcome(r);
     }
     pill.tabIndex = 0;
     pill.setAttribute("aria-label", `${pill.textContent}. ${pill.title}`);
-    out.append(pill);
-    tr.append(out);
-    const actions = document.createElement("td");
-    actions.dataset.label = "Actions";
-    actions.className = "history-actions-cell";
-    if (r.live) {
-      const resume = document.createElement("button");
-      resume.className = "button button-primary button-small";
-      resume.type = "button";
-      resume.textContent = "Return";
-      resume.title = "Return to the active timer.";
-      resume.addEventListener("click", () => navigate("timer-screen"));
-      actions.append(resume);
-    } else {
-      const edit = document.createElement("button");
-      edit.className = "button button-secondary button-small";
-      edit.type = "button";
-      edit.textContent = "Edit";
-      edit.title = "Edit topics and notes for this session.";
-      edit.addEventListener("click", () => openEdit(r.id));
-      const del = document.createElement("button");
-      del.className = "button button-danger-outline button-small";
-      del.type = "button";
-      del.textContent = "Delete";
-      del.title = "Delete this session from local history.";
-      del.addEventListener("click", () => deleteSession(r.id));
-      actions.append(edit, del);
+    const menuItems = r.live
+      ? [{ label: "Return to timer", onClick: () => navigate("timer-screen") }]
+      : [
+          { label: "Edit session", onClick: () => openEdit(r.id) },
+          ...(noteItems.length
+            ? [
+                { label: "View notes", onClick: () => openSessionNotesViewer(r.id) },
+                { label: "Open in Notes", onClick: () => openNotesFilteredToSession(r.id) }
+              ]
+            : []),
+          { label: "Delete", danger: true, onClick: () => deleteSession(r.id) }
+        ];
+    const menu = createNoteOptionsMenu(menuItems);
+    const toggle = menu.querySelector(".note-options-toggle");
+    if (toggle) {
+      toggle.setAttribute("aria-label", "Session options");
+      toggle.title = "Session options";
     }
-    tr.append(actions);
-    dom.historyTableBody.append(tr);
+    actions.append(pill, menu);
+
+    const head = document.createElement("div");
+    head.className = "history-session-head";
+    head.append(titleWrap, actions);
+
+    const sub = document.createElement("div");
+    sub.className = "history-session-sub";
+    const focusText = formatDuration(r.focusSeconds);
+    const elapsedText = formatDuration(r.elapsedSeconds);
+    const scoreText = r.live ? "—" : score == null ? "N/A" : `${score}%`;
+    const dateSpan = document.createElement("time");
+    dateSpan.className = "history-session-date";
+    dateSpan.dateTime = r.completedAt;
+    dateSpan.textContent = formatDate(r.completedAt);
+    dateSpan.title = r.live ? `Started ${formatDate(r.completedAt)}.` : `Saved ${formatDate(r.completedAt)}.`;
+
+    const stats = document.createElement("div");
+    stats.className = "history-session-stats";
+    const makeStat = (labelText, valueEl) => {
+      const item = document.createElement("div");
+      item.className = "history-stat";
+      const labelEl = document.createElement("span");
+      labelEl.className = "history-stat-label";
+      labelEl.textContent = labelText;
+      item.append(labelEl, valueEl);
+      return item;
+    };
+    const focusSpan = document.createElement("strong");
+    focusSpan.className = "history-metric-value";
+    focusSpan.dataset.historyFocus = "";
+    focusSpan.textContent = focusText;
+    focusSpan.title = r.live
+      ? `Active focus so far: ${focusText} of ${formatDuration(r.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`
+      : `Active focus time: ${focusText} of ${formatDuration(r.targetSeconds)} planned (${b.completionPct}%). Breaks are excluded.`;
+    const elapsedSpan = document.createElement("strong");
+    elapsedSpan.className = "history-metric-value";
+    elapsedSpan.dataset.historyElapsed = "";
+    elapsedSpan.textContent = elapsedText;
+    elapsedSpan.title = r.live
+      ? `Clock time so far including breaks: ${elapsedText} (breaks ${formatDuration(r.breakSeconds)}).`
+      : `Total clock time including breaks: ${elapsedText} (breaks ${formatDuration(r.breakSeconds)}).`;
+    const scoreSpan = document.createElement("strong");
+    scoreSpan.className = "history-metric-value";
+    scoreSpan.dataset.historyScore = "";
+    scoreSpan.textContent = scoreText;
+    scoreSpan.title = r.live ? "Score is calculated when the session ends." : explainScore(r);
+    if (!r.live) {
+      scoreSpan.tabIndex = 0;
+      scoreSpan.setAttribute("aria-label", `Score: ${scoreText}. ${scoreSpan.title}`);
+    }
+    stats.append(
+      makeStat("Focus", focusSpan),
+      makeStat("Elapsed", elapsedSpan),
+      makeStat("Score", scoreSpan)
+    );
+    sub.append(dateSpan, stats);
+
+    const meta = document.createElement("div");
+    meta.className = "history-session-meta";
+    if (r.tag) {
+      const tag = document.createElement("span");
+      tag.className = "history-chip";
+      tag.textContent = r.tag;
+      tag.title = `Tag: ${r.tag}.`;
+      meta.append(tag);
+    }
+    if (r.topic) {
+      const topics = document.createElement("span");
+      topics.className = "history-chip history-chip-muted";
+      topics.textContent = r.topic;
+      topics.title = "Topics / work tagged for this session.";
+      meta.append(topics);
+    }
+    if (noteItems.length) {
+      const notesChip = document.createElement("button");
+      notesChip.type = "button";
+      notesChip.className = "history-chip history-chip-notes";
+      notesChip.textContent = noteItems.length === 1 ? "1 note" : `${noteItems.length} notes`;
+      notesChip.title = noteItems.map((n, i) => `Note ${i + 1}: ${n.text}`).join("\n\n");
+      notesChip.setAttribute(
+        "aria-label",
+        `${noteItems.length} note${noteItems.length === 1 ? "" : "s"} for ${r.intent}. Open notes.`
+      );
+      notesChip.addEventListener("click", () => {
+        if (r.live) openNotesFilteredToSession(r.id);
+        else openSessionNotesViewer(r.id);
+      });
+      meta.append(notesChip);
+    }
+
+    main.append(head, sub);
+    if (meta.childElementCount) main.append(meta);
+    card.append(main);
+    dom.historyTableBody.append(card);
   });
   const filteredEmpty = rows.length === 0;
   const hasHistoryButFilteredOut = (state.history.length > 0 || Boolean(state.session)) && filteredEmpty;
@@ -836,7 +973,7 @@ export function exportJson() {
     showToast("There are no sessions to back up.");
     return;
   }
-  download("locked-in-backup.json",JSON.stringify({schemaVersion:3,exportedAt:new Date().toISOString(),app:"Locked-In",sessions:state.history,notesInbox:state.inbox},null,2),"application/json");showToast("Backup file ready.");
+  download("locked-in-backup.json",JSON.stringify({schemaVersion:4,exportedAt:new Date().toISOString(),app:"Locked-In",sessions:state.history,notesInbox:state.inbox,todos:state.todos},null,2),"application/json");showToast("Backup file ready.");
 }
 
 export async function importJson(file) {
@@ -850,13 +987,17 @@ export async function importJson(file) {
     const replace=window.confirm("Restore backup: press OK to replace your history, or Cancel to merge it with your existing sessions.");
     const previousHistory=state.history.slice();
     const previousInbox=state.inbox.slice();
+    const previousTodos=state.todos ? JSON.parse(JSON.stringify(state.todos)) : null;
     if(replace)state.history=normalized;else{const map=new Map(state.history.map(r=>[r.id,r]));normalized.forEach(r=>map.set(r.id,r));state.history=[...map.values()].sort((a,b)=>Date.parse(b.completedAt)-Date.parse(a.completedAt)).slice(0,MAX_HISTORY);}
     if(Array.isArray(parsed.notesInbox))state.inbox=parsed.notesInbox.map(n=>({id:String(n.id||`${Date.now()}-${Math.random()}`),text:String(n.text||"").slice(0,2000),createdAt:n.createdAt||new Date().toISOString()})).filter(n=>n.text.trim()).slice(0,200);
+    if(parsed.todos && typeof parsed.todos === "object") state.todos = normalizeTodosDoc(parsed.todos);
     const historyOk=saveHistory();
     const inboxOk=Array.isArray(parsed.notesInbox) ? saveInbox() : true;
-    if (!historyOk || !inboxOk) {
+    const todosOk=parsed.todos && typeof parsed.todos === "object" ? saveTodos() : true;
+    if (!historyOk || !inboxOk || !todosOk) {
       state.history=previousHistory;
       state.inbox=previousInbox;
+      state.todos=previousTodos;
       showToast("Could not restore — browser storage unavailable. Try Save backup first.");
       return;
     }

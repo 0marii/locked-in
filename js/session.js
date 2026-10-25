@@ -1,13 +1,13 @@
-import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=78";
-import { dom, state, tabId } from "./runtime.js?v=78";
-import { safeRead, safeWrite } from "./storage.js?v=78";
-import { showToast } from "./toast.js?v=78";
-import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=78";
-import { broadcast } from "./sync.js?v=78";
-import { navigate } from "./theme-nav.js?v=78";
-import { currentTagValue, pomodoroIntervalSeconds, rememberRecentGoal, renderRecentGoals, resetSetupFormDefaults } from "./setup.js?v=78";
-import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=78";
-import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=78";
+import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=140";
+import { dom, state, tabId } from "./runtime.js?v=140";
+import { safeRead, safeWrite } from "./storage.js?v=140";
+import { showToast } from "./toast.js?v=140";
+import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=140";
+import { broadcast } from "./sync.js?v=140";
+import { navigate } from "./theme-nav.js?v=140";
+import { currentTagValue, pomodoroIntervalSeconds, rememberRecentGoal, renderRecentGoals, resetSetupFormDefaults } from "./setup.js?v=140";
+import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=140";
+import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=140";
 
 export function normalizeRecord(record) {
   if (!record || typeof record !== "object") return null;

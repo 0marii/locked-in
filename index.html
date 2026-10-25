@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-title" content="Locked-In">
   <meta name="author" content="Mohammad Al-Omari">
   <meta name="color-scheme" content="dark light">
-  <link rel="stylesheet" href="./style.css?v=78">
+  <link rel="stylesheet" href="./style.css?v=140">
   
   <!-- Prevent Theme FOUC -->
   <script>
@@ -59,7 +59,7 @@
   }
   </script>
   
-  <script type="module" src="./app.js?v=78"></script>
+  <script type="module" src="./app.js?v=140"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
@@ -82,10 +82,12 @@
     </button>
 
     <nav class="site-nav" id="site-nav" aria-label="Main navigation">
-      <button class="nav-link is-active" type="button" data-screen="setup-screen">Timer</button>
-      <button class="nav-link" type="button" data-screen="history-screen">History</button>
-      <button class="nav-link" type="button" data-screen="insights-screen">Insights</button>
-      <button class="nav-link" type="button" data-screen="notes-screen">Notes</button>
+      <button class="nav-link is-active" type="button" data-screen="setup-screen"><span class="nav-icon" data-nav-icon="setup" hidden aria-hidden="true"></span><span>Timer</span></button>
+      <button class="nav-link" type="button" data-screen="history-screen"><span class="nav-icon" data-nav-icon="history" hidden aria-hidden="true"></span><span>History</span></button>
+      <button class="nav-link" type="button" data-screen="insights-screen"><span class="nav-icon" data-nav-icon="insights" hidden aria-hidden="true"></span><span>Insights</span></button>
+      <button class="nav-link" type="button" data-screen="notes-screen"><span class="nav-icon" data-nav-icon="notes" hidden aria-hidden="true"></span><span>Notes</span></button>
+      <button class="nav-link" type="button" data-screen="todos-screen"><span class="nav-icon" data-nav-icon="todos" hidden aria-hidden="true"></span><span>To-Do</span></button>
+      <button class="nav-link" type="button" data-screen="customize-screen"><span class="nav-icon" data-nav-icon="customize" hidden aria-hidden="true"></span><span>Customize</span></button>
       <div class="theme-picker">
         <button class="theme-button" id="theme-button" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Theme picker">
           <span class="theme-swatch" aria-hidden="true"></span><span class="theme-name">Dark</span><span class="theme-caret" aria-hidden="true"></span>
@@ -97,6 +99,7 @@
           <button type="button" data-theme="violet" role="radio"><span class="swatch swatch-violet"></span>Violet</button>
           <button type="button" data-theme="pink" role="radio"><span class="swatch swatch-pink"></span>Pink</button>
           <button type="button" data-theme="blue" role="radio"><span class="swatch swatch-blue"></span>Blue</button>
+          <button type="button" data-theme="custom" role="radio"><span class="swatch swatch-custom"></span>Custom</button>
         </div>
       </div>
     </nav>
@@ -249,6 +252,13 @@
                     <small>Show the 12-week heatmap on Setup.</small>
                   </span>
                 </label>
+                <label class="prefs-toggle">
+                  <input id="pref-show-setup-todos" type="checkbox" checked>
+                  <span class="prefs-toggle-copy">
+                    <strong>To-Do today</strong>
+                    <small>Show My Day / overdue counts on Setup.</small>
+                  </span>
+                </label>
               </div>
 
               <div class="prefs-group">
@@ -283,32 +293,51 @@
             <div class="goal-progress-track" aria-hidden="true"><span id="setup-daily-progress-bar"></span></div>
             <p class="field-hint" id="setup-weekly-progress-hint">This week: 0m / 10h</p>
           </div>
-          <div class="panel note-panel">
-            <p class="eyebrow">THE RULE IS SIMPLE</p>
-            <div class="note-symbol" aria-hidden="true">✳</div>
-            <h2>One thing<br>at a time.</h2>
-            <p>Don't optimize every minute. Pick a meaningful task, start the clock, and give yourself room to do the work.</p>
-            <div class="note-divider"></div>
-            <div class="mini-stat"><span>Completed sessions</span><strong id="setup-completed-count">0</strong></div>
-            <div class="mini-stat"><span>All attempts</span><strong id="setup-all-count">0</strong></div>
-            <div class="mini-stat"><span>Completed focus time</span><strong id="setup-total-focus">0s</strong></div>
+          <div class="panel setup-todos-widget" id="setup-todos-widget">
+            <div class="setup-todos-top">
+              <div>
+                <p class="eyebrow">TO-DO</p>
+                <h2 id="setup-todos-headline">Nothing planned</h2>
+              </div>
+              <button class="text-button" id="setup-todos-open-btn" type="button">Open →</button>
+            </div>
+            <div class="setup-todos-metrics" aria-label="To-do counts">
+              <button type="button" class="setup-todos-metric" data-setup-todo-view="myday" aria-label="Open My Day tasks">
+                <strong id="setup-todos-myday">0</strong>
+                <span>Today</span>
+              </button>
+              <button type="button" class="setup-todos-metric" data-setup-todo-view="overdue" aria-label="Open overdue tasks">
+                <strong id="setup-todos-overdue">0</strong>
+                <span>Overdue</span>
+              </button>
+              <button type="button" class="setup-todos-metric" data-setup-todo-view="open" aria-label="Open all tasks">
+                <strong id="setup-todos-open">0</strong>
+                <span>Open</span>
+              </button>
+            </div>
+            <label class="setup-todos-source">
+              <span class="setup-todos-source-label">Show</span>
+              <select id="setup-todos-source" aria-label="Choose which tasks to show"></select>
+            </label>
+            <div class="setup-todos-preview" id="setup-todos-preview"></div>
+            <p class="field-hint" id="setup-todos-hint">Add a few tasks, then start focusing.</p>
           </div>
-          <button type="button" class="panel setup-heatmap-panel" id="setup-heatmap-btn" aria-label="Open Insights to view the focus heatmap">
+          <section class="panel setup-heatmap-panel" id="setup-heatmap-panel" aria-label="Focus heatmap">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">12 WEEKS</p>
                 <h2>Focus heatmap</h2>
               </div>
-              <span class="setup-heatmap-go" aria-hidden="true">Insights →</span>
+              <button type="button" class="setup-heatmap-go" id="setup-heatmap-btn">Insights →</button>
             </div>
-            <p class="local-data-note setup-heatmap-note">Completed focus by day. Click to open Insights.</p>
+            <p class="local-data-note setup-heatmap-note">Completed focus by day. Click a filled day to open it in History.</p>
             <div class="heatmap-frame heatmap-frame-compact" data-heatmap-root>
               <div class="heatmap-months" data-heatmap-months aria-hidden="true"></div>
               <div class="heatmap-main">
                 <div class="heatmap-weekdays" aria-hidden="true">
                   <span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span>
                 </div>
-                <div id="setup-heatmap" class="heatmap" data-heatmap-grid aria-hidden="true"></div>
+                <div id="setup-heatmap" class="heatmap" data-heatmap-grid></div>
               </div>
               <div class="heatmap-footer">
                 <span class="heatmap-foot-note">Completed focus only</span>
@@ -326,7 +355,7 @@
               </div>
             </div>
             <ul id="setup-heatmap-text" class="visually-hidden"></ul>
-          </button>
+          </section>
           <div class="tip-card">
             <span class="tip-icon" aria-hidden="true">↳</span>
             <p><strong>Tip</strong> Write the goal as an action — “Build the login page,” not “Work on project.”</p>
@@ -436,79 +465,71 @@
         <h1 id="history-title">Session history<span class="title-period">.</span></h1>
         <p>A private record of the time you've chosen to protect.</p>
       </div>
-      <div class="history-summary">
-        <div class="panel summary-card"><span class="metric-label">COMPLETED</span><strong id="history-completed-count">0</strong><small>Reached 70%+ of plan</small></div>
-        <div class="panel summary-card"><span class="metric-label">ALL ATTEMPTS</span><strong id="history-attempt-count">0</strong><small>Completed + incomplete + failed</small></div>
-        <div class="panel summary-card"><span class="metric-label">COMPLETED FOCUS</span><strong id="history-total-focus">0s</strong><small>Only completed sessions</small></div>
+      <div class="history-summary" role="group" aria-label="History totals">
+        <div class="history-summary-item" title="Reached 70%+ of plan">
+          <span class="metric-label">Completed</span>
+          <strong id="history-completed-count">0</strong>
+          <small>70%+ of plan</small>
+        </div>
+        <div class="history-summary-item" title="Completed + incomplete + failed">
+          <span class="metric-label">Attempts</span>
+          <strong id="history-attempt-count">0</strong>
+          <small>All sessions</small>
+        </div>
+        <div class="history-summary-item" title="Only completed sessions">
+          <span class="metric-label">Focus</span>
+          <strong id="history-total-focus">0s</strong>
+          <small>Completed only</small>
+        </div>
       </div>
-      <div class="history-toolbar">
-        <label class="search-field" for="history-search"><span aria-hidden="true">⌕</span><input id="history-search" type="search" placeholder="Search goals, topics, or notes…" autocomplete="off"></label>
-        <div class="history-filters" role="group" aria-label="Filter and sort history">
-          <div class="history-filters-main">
-            <div class="compact-field date-field" data-date-field="from">
-              <span id="history-date-from-label">From</span>
-              <button class="date-field-trigger" id="history-date-from-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-labelledby="history-date-from-label">
-                <span class="date-field-value" id="history-date-from-display">Any date</span>
-              </button>
-              <input id="history-date-from" type="hidden" value="">
-            </div>
-            <div class="compact-field date-field" data-date-field="to">
-              <span id="history-date-to-label">To</span>
-              <button class="date-field-trigger" id="history-date-to-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-labelledby="history-date-to-label">
-                <span class="date-field-value" id="history-date-to-display">Any date</span>
-              </button>
-              <input id="history-date-to" type="hidden" value="">
-            </div>
-            <label class="compact-field compact-field-select" for="history-sort">
-              <span>Sort</span>
-              <select id="history-sort">
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest</option>
-                <option value="focus">Most focus</option>
-              </select>
-            </label>
-            <label class="compact-field compact-field-select" for="history-tag-filter">
-              <span>Tag</span>
-              <select id="history-tag-filter">
-                <option value="">All tags</option>
-              </select>
-            </label>
+      <div class="history-toolbar" role="group" aria-label="Search and filter history">
+        <label class="search-field history-search" for="history-search"><span aria-hidden="true">⌕</span><input id="history-search" type="search" placeholder="Search…" autocomplete="off"></label>
+        <div class="history-filters-main">
+          <div class="compact-field date-field" data-date-field="from">
+            <span id="history-date-from-label">From</span>
+            <button class="date-field-trigger" id="history-date-from-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-labelledby="history-date-from-label">
+              <span class="date-field-value" id="history-date-from-display">Any date</span>
+            </button>
+            <input id="history-date-from" type="hidden" value="">
           </div>
-          <button class="history-clear-filters-btn" id="clear-history-filters-btn" type="button">Clear filters</button>
+          <div class="compact-field date-field" data-date-field="to">
+            <span id="history-date-to-label">To</span>
+            <button class="date-field-trigger" id="history-date-to-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-labelledby="history-date-to-label">
+              <span class="date-field-value" id="history-date-to-display">Any date</span>
+            </button>
+            <input id="history-date-to" type="hidden" value="">
+          </div>
+          <label class="compact-field compact-field-select" for="history-sort">
+            <span>Sort</span>
+            <select id="history-sort">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="focus">Most focus</option>
+            </select>
+          </label>
+          <label class="compact-field compact-field-select" for="history-tag-filter">
+            <span>Tag</span>
+            <select id="history-tag-filter">
+              <option value="">All tags</option>
+            </select>
+          </label>
         </div>
-        <div class="history-actions">
-          <button class="button button-secondary button-small" id="export-csv-btn" type="button" title="Download your sessions as a spreadsheet file">Download spreadsheet</button>
-          <button class="button button-secondary button-small" id="export-json-btn" type="button" title="Save a full backup of your sessions and notes">Save backup</button>
-          <label class="button button-secondary button-small import-label" for="import-json-input" title="Restore sessions from a backup file">Restore backup</label><input id="import-json-input" class="visually-hidden" type="file" accept="application/json,.json">
-          <button class="button button-danger-outline button-small" id="clear-history-btn" type="button">Clear history</button>
-        </div>
+        <button class="history-clear-filters-btn" id="clear-history-filters-btn" type="button">Clear</button>
+        <div id="history-actions" class="history-actions note-card-actions"></div>
+        <input id="import-json-input" class="visually-hidden" type="file" accept="application/json,.json">
       </div>
-      <div class="panel history-panel">
-        <div class="table-scroll-shell" id="history-table-shell">
-          <div class="table-scroll" id="history-table-scroll" tabindex="0" aria-label="Session history table. Scroll sideways to see more columns.">
-            <table class="history-table">
-              <caption class="visually-hidden">Saved focus sessions, including goals, notes, time, and outcomes. Scroll horizontally when needed.</caption>
-              <thead><tr>
-                <th scope="col" title="When this session was saved.">Date</th>
-                <th scope="col" title="The focus goal you set when starting the session.">Goal</th>
-                <th scope="col" title="Optional session tag (Study, Code, Writing, or custom).">Tag</th>
-                <th scope="col" title="Optional topics or work areas you tagged for this session.">Topics / work</th>
-                <th scope="col" title="Notes captured during or after the session.">Notes</th>
-                <th scope="col" title="Active focus time only — pauses/breaks are not included.">Focus</th>
-                <th scope="col" title="Total clock time from start to finish, including breaks.">Elapsed</th>
-                <th scope="col" title="Time-based completion score from focused / planned time, minus break penalties. Requires at least 70% of the plan. Not a measure of concentration quality.">Completion score</th>
-                <th scope="col" title="Final session result: Completed, Incomplete, Ended early, or Hardcore failed.">Outcome</th>
-                <th scope="col" title="Edit topics/notes or delete this session from local history.">Actions</th>
-              </tr></thead>
-              <tbody id="history-table-body"></tbody>
-            </table>
+      <div class="history-panel">
+        <div class="history-list-shell" id="history-table-shell">
+          <div class="history-list-scroll" id="history-table-scroll" tabindex="-1">
+            <div class="history-list" id="history-table-body" role="list" aria-label="Saved focus sessions"></div>
           </div>
           <div class="table-scroll-hint" id="history-scroll-hint" hidden>
             <p class="table-scroll-hint-pill">← Scroll sideways for more columns →</p>
           </div>
         </div>
         <div class="empty-state" id="history-empty">
-          <span aria-hidden="true">◷</span><h2>No sessions yet</h2><p>Your completed sessions will appear here. Start with one small goal.</p>
+          <h2>No sessions yet</h2>
+          <p>Completed and incomplete attempts will appear here.</p>
           <button class="button button-primary" id="history-start-btn" type="button">Start a session</button>
         </div>
       </div>
@@ -530,47 +551,80 @@
         <div class="focus-goals-grid">
           <div class="focus-goal-block" data-goal="daily">
             <div class="goal-editor-head">
-              <label for="goal-daily-slider">Daily goal</label>
-              <strong id="goal-daily-display" aria-live="polite">2h 00m</strong>
+              <label for="goal-daily-slider">Daily</label>
+              <div class="goal-time-edit" aria-label="Daily goal duration">
+                <label class="visually-hidden" for="goal-daily-hours">Hours</label>
+                <input id="goal-daily-hours" type="number" inputmode="numeric" min="0" max="23" step="1" value="2" aria-label="Daily hours">
+                <span class="goal-time-sep" aria-hidden="true">h</span>
+                <label class="visually-hidden" for="goal-daily-mins">Minutes</label>
+                <input id="goal-daily-mins" type="number" inputmode="numeric" min="0" max="59" step="5" value="00" aria-label="Daily minutes">
+                <span class="goal-time-sep" aria-hidden="true">m</span>
+              </div>
             </div>
+            <strong id="goal-daily-display" class="visually-hidden" aria-live="polite">2h 00m</strong>
             <input id="goal-daily-slider" class="goal-slider" type="range" min="15" max="720" step="15" value="120" aria-valuetext="2 hours">
-            <div class="goal-hm-fields">
-              <label class="goal-hm-field" for="goal-daily-hours">
-                <span>Hours</span>
-                <input id="goal-daily-hours" type="number" inputmode="numeric" min="0" max="23" step="1" value="2">
-              </label>
-              <label class="goal-hm-field" for="goal-daily-mins">
-                <span>Minutes</span>
-                <input id="goal-daily-mins" type="number" inputmode="numeric" min="0" max="59" step="5" value="0">
-              </label>
+            <div class="goal-progress-foot">
+              <p class="goal-progress-copy" id="insights-daily-progress-label">0m / 2h today</p>
+              <div class="goal-progress-track" aria-hidden="true"><span id="insights-daily-progress-bar"></span></div>
             </div>
-            <p class="local-data-note" id="insights-daily-progress-label">0m / 2h today</p>
-            <div class="goal-progress-track" aria-hidden="true"><span id="insights-daily-progress-bar"></span></div>
           </div>
           <div class="focus-goal-block" data-goal="weekly">
             <div class="goal-editor-head">
-              <label for="goal-weekly-slider">Weekly goal</label>
-              <strong id="goal-weekly-display" aria-live="polite">10h 00m</strong>
+              <label for="goal-weekly-slider">Weekly</label>
+              <div class="goal-time-edit" aria-label="Weekly goal duration">
+                <label class="visually-hidden" for="goal-weekly-hours">Hours</label>
+                <input id="goal-weekly-hours" type="number" inputmode="numeric" min="0" max="168" step="1" value="10" aria-label="Weekly hours">
+                <span class="goal-time-sep" aria-hidden="true">h</span>
+                <label class="visually-hidden" for="goal-weekly-mins">Minutes</label>
+                <input id="goal-weekly-mins" type="number" inputmode="numeric" min="0" max="59" step="5" value="00" aria-label="Weekly minutes">
+                <span class="goal-time-sep" aria-hidden="true">m</span>
+              </div>
             </div>
+            <strong id="goal-weekly-display" class="visually-hidden" aria-live="polite">10h 00m</strong>
             <input id="goal-weekly-slider" class="goal-slider" type="range" min="30" max="2520" step="30" value="600" aria-valuetext="10 hours">
-            <div class="goal-hm-fields">
-              <label class="goal-hm-field" for="goal-weekly-hours">
-                <span>Hours</span>
-                <input id="goal-weekly-hours" type="number" inputmode="numeric" min="0" max="168" step="1" value="10">
-              </label>
-              <label class="goal-hm-field" for="goal-weekly-mins">
-                <span>Minutes</span>
-                <input id="goal-weekly-mins" type="number" inputmode="numeric" min="0" max="59" step="5" value="0">
-              </label>
+            <div class="goal-progress-foot">
+              <p class="goal-progress-copy" id="insights-weekly-progress-label">0m / 10h this week</p>
+              <div class="goal-progress-track" aria-hidden="true"><span id="insights-weekly-progress-bar"></span></div>
             </div>
-            <p class="local-data-note" id="insights-weekly-progress-label">0m / 10h this week</p>
-            <div class="goal-progress-track" aria-hidden="true"><span id="insights-weekly-progress-bar"></span></div>
+          </div>
+        </div>
+        <div class="focus-week-reset" id="focus-week-reset">
+          <div class="focus-week-reset-copy">
+            <p class="focus-week-reset-eyebrow">Week reset</p>
+            <strong id="goal-week-reset-status">Current window</strong>
+            <p class="local-data-note" id="goal-week-reset-hint">Auto-resets every Monday. History stays.</p>
+          </div>
+          <div class="focus-week-reset-controls">
+            <label class="focus-week-reset-field" for="goal-week-starts-on">
+              <span class="visually-hidden">Auto-reset day</span>
+              <select id="goal-week-starts-on" aria-label="Auto-reset day" aria-describedby="goal-week-reset-hint">
+                <option value="0">Sunday</option>
+                <option value="1" selected>Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+            </label>
+            <button class="button button-secondary button-small" id="reset-week-now-btn" type="button">Reset now</button>
           </div>
         </div>
         <div class="focus-goals-actions" id="focus-goals-actions" hidden>
           <p class="focus-goals-hint" id="focus-goals-hint" role="status" aria-live="polite">Unsaved changes — save to update your progress.</p>
           <button class="button button-primary focus-goals-save-btn" id="save-focus-goals-btn" type="button">Save goals</button>
         </div>
+      </section>
+      <section class="panel insight-panel week-reports-panel" id="week-reports-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">WEEK REPORTS</p>
+            <h2>Performance archive</h2>
+          </div>
+        </div>
+        <p class="local-data-note">When a week resets, your session history is kept. Progress starts fresh and a full report is saved here — sessions, todos, and goal performance.</p>
+        <p class="week-reports-empty" id="week-reports-empty">No week reports yet. They appear automatically after your first weekly reset.</p>
+        <div class="week-reports-list" id="week-reports-list"></div>
       </section>
       <div class="panel insights-empty-patterns" id="insights-empty-patterns" hidden>
         <p class="eyebrow">PATTERNS</p>
@@ -607,10 +661,10 @@
                 <div class="heatmap-weekdays" aria-hidden="true">
                   <span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span>
                 </div>
-                <div id="heatmap" class="heatmap" data-heatmap-grid aria-hidden="true"></div>
+                <div id="heatmap" class="heatmap" data-heatmap-grid></div>
               </div>
               <div class="heatmap-footer">
-                <span class="heatmap-foot-note">Based on completed focus only · last 12 weeks</span>
+                <span class="heatmap-foot-note">Completed focus only · click a filled day for History</span>
                 <div class="heatmap-legend" aria-hidden="true">
                   <span>Less</span>
                   <div class="heatmap-legend-cells">
@@ -636,12 +690,20 @@
     </section>
 
     <section id="notes-screen" class="screen" aria-labelledby="notes-title">
-      <div class="section-hero notes-hero-row">
-        <div><p class="eyebrow">YOUR NOTES</p><h1 id="notes-title">Thoughts worth keeping.</h1><p>Session notes live here, plus an inbox for quick thoughts when no session is active.</p></div>
-        <form id="note-capture-form" class="quick-capture panel"><label for="note-capture-input">Quick capture</label><textarea id="note-capture-input" maxlength="2000" rows="3" placeholder="Capture a thought…"></textarea><button class="button button-primary" type="submit">Add to inbox</button></form>
+      <div class="section-hero notes-hero">
+        <p class="eyebrow">YOUR NOTES</p>
+        <h1 id="notes-title">Thoughts worth keeping.</h1>
+        <p>Inbox for quick thoughts. Session notes appear after you focus.</p>
       </div>
       <div class="notes-toolbar">
-        <label class="search-field notes-search" for="notes-search"><span aria-hidden="true">⌕</span><input id="notes-search" type="search" placeholder="Search notes and goals…" autocomplete="off"></label>
+        <form id="note-capture-form" class="notes-capture">
+          <label class="notes-capture-label" for="note-capture-input">Quick note</label>
+          <div class="notes-capture-row">
+            <input id="note-capture-input" type="text" maxlength="2000" placeholder="Write a quick thought…" autocomplete="off">
+            <button class="button button-primary notes-capture-btn" type="submit">Add</button>
+          </div>
+        </form>
+        <label class="search-field notes-search" for="notes-search"><span aria-hidden="true">⌕</span><input id="notes-search" type="search" placeholder="Search notes…" autocomplete="off"></label>
         <div class="notes-filter-bar is-hidden" id="notes-filter-bar" role="status" aria-live="polite" hidden>
           <span class="notes-filter-copy">
             <strong>Filter on</strong>
@@ -651,37 +713,199 @@
         </div>
       </div>
       <div class="notes-columns" id="notes-columns">
-        <section class="panel notes-list" id="notes-inbox-panel">
-          <div class="panel-heading"><div><p class="eyebrow">INBOX</p><h2>Quick thoughts</h2></div></div>
-          <div id="notes-inbox"></div>
+        <section class="notes-section" id="notes-inbox-panel">
+          <header class="notes-section-head">
+            <h2>Inbox</h2>
+            <span class="notes-section-hint">Anytime</span>
+          </header>
+          <div id="notes-inbox" class="notes-feed"></div>
         </section>
-        <section class="panel notes-list" id="notes-sessions-panel">
-          <div class="panel-heading"><div><p class="eyebrow">SESSIONS</p><h2>Session notes</h2></div></div>
-          <div id="notes-sessions"></div>
+        <section class="notes-section" id="notes-sessions-panel">
+          <header class="notes-section-head">
+            <h2>Sessions</h2>
+            <span class="notes-section-hint">From focus</span>
+          </header>
+          <div id="notes-sessions" class="notes-feed"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="todos-screen" class="screen" aria-labelledby="todos-title">
+      <div class="section-hero todos-hero">
+        <div>
+          <p class="eyebrow">TO-DO</p>
+          <h1 id="todos-title">Get things done.</h1>
+          <p>Lists, My Day, due dates, and steps — inspired by Microsoft To Do.</p>
+        </div>
+      </div>
+      <div class="todos-shell panel">
+        <aside class="todos-rail" id="todos-rail" aria-label="Task lists"></aside>
+        <div class="todos-main" id="todos-main" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section id="customize-screen" class="screen" aria-labelledby="customize-title">
+      <div class="section-hero customize-hero">
+        <div class="customize-hero-copy">
+          <p class="eyebrow">CUSTOMIZE</p>
+          <h1 id="customize-title">Make it yours.</h1>
+        </div>
+        <p class="customize-mode-pill" id="customize-mode-label">Using preset theme</p>
+      </div>
+
+      <div class="customize-layout">
+        <section class="panel customize-panel customize-colors">
+          <div class="panel-heading">
+            <div><p class="eyebrow">COLORS</p><h2>Theme colors</h2></div>
+            <div class="customize-color-readout" aria-live="polite">
+              <span class="customize-color-swatch" id="customize-color-swatch" aria-hidden="true"></span>
+              <code id="customize-color-hex">—</code>
+            </div>
+          </div>
+          <div class="color-role-tabs" role="radiogroup" aria-label="Color role">
+            <button type="button" class="button button-secondary button-small" data-color-role="bg" role="radio" aria-checked="false" title="Page background behind everything.">Page</button>
+            <button type="button" class="button button-secondary button-small" data-color-role="surface" role="radio" aria-checked="false" title="Cards, panels, and fields sitting on the page. Keep this different from Page so sections stay readable.">Cards</button>
+            <button type="button" class="button button-secondary button-small" data-color-role="text" role="radio" aria-checked="false" title="Main text color. Also sets the font color.">Text</button>
+            <button type="button" class="button button-secondary button-small is-selected" data-color-role="accent" role="radio" aria-checked="true" title="Highlights, buttons, and focus accents.">Accent</button>
+            <button type="button" class="button button-secondary button-small" data-color-role="navBg" role="radio" aria-checked="false" title="Top navigation bar background only — separate from the page background.">Nav bar</button>
+            <button type="button" class="button button-secondary button-small" data-color-role="navText" role="radio" aria-checked="false" title="Brand and nav link text color in the top bar.">Nav text</button>
+          </div>
+          <div class="color-wheel-wrap">
+            <canvas class="color-wheel" id="color-wheel" width="240" height="240" role="img" aria-label="HSV color wheel. Click to pick a color for the selected role."></canvas>
+            <label class="color-wheel-value field" for="customize-color-value">
+              <span>Brightness</span>
+              <input id="customize-color-value" type="range" min="20" max="100" step="1" value="100" aria-valuetext="100 percent">
+            </label>
+          </div>
+          <p class="local-data-note">Pick a role, then click the wheel. <strong>Nav bar</strong> / <strong>Nav text</strong> only change the top menu. Keep <strong>Page</strong> and <strong>Cards</strong> different so panels stay readable.</p>
+
+          <div class="suggested-themes">
+            <div class="suggested-themes-head">
+              <p class="eyebrow">SUGGESTED</p>
+              <a class="local-data-note suggested-themes-source" href="https://color.adobe.com/explore" target="_blank" rel="noopener noreferrer">Adobe Color explore ↗</a>
+            </div>
+            <div class="suggested-theme-grid" id="suggested-theme-grid" role="list"></div>
+          </div>
+        </section>
+
+        <section class="panel customize-panel customize-type">
+          <div class="panel-heading">
+            <div><p class="eyebrow">TYPOGRAPHY</p><h2>Font</h2></div>
+          </div>
+          <label class="field" for="customize-font-family">
+            <span>Font family</span>
+            <select id="customize-font-family">
+              <option value="system">System UI</option>
+              <option value="serif">Serif</option>
+              <option value="mono">Monospace</option>
+              <option value="georgia">Georgia</option>
+              <option value="verdana">Verdana</option>
+              <option value="trebuchet">Trebuchet</option>
+              <option value="courier">Courier</option>
+            </select>
+          </label>
+          <p class="customize-font-preview" id="customize-font-preview">The quick brown fox jumps over the lazy dog.</p>
+        </section>
+
+        <section class="panel customize-panel customize-icons">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">NAV ICONS</p>
+              <h2>Custom icons</h2>
+            </div>
+          </div>
+          <p class="customize-icons-hint">Upload an SVG for each nav item to personalize the top menu. Icons stay on this device only — helpful if you want Locked-In to feel like yours at a glance.</p>
+          <p class="local-data-note customize-icons-limits">Use simple SVG files, max 50 KB. Scripts and unsafe markup are stripped for safety.</p>
+          <div class="customize-icon-grid" id="customize-icon-grid">
+            <div class="customize-icon-row" data-icon-key="setup">
+              <div class="customize-icon-preview" data-icon-preview="setup" aria-hidden="true">—</div>
+              <div class="customize-icon-meta"><strong>Timer</strong></div>
+              <label class="button button-secondary button-small">Upload<input id="icon-upload-setup" class="visually-hidden" type="file" accept="image/svg+xml,.svg"></label>
+              <button class="button button-ghost button-small" id="icon-clear-setup" type="button">Clear</button>
+            </div>
+            <div class="customize-icon-row" data-icon-key="history">
+              <div class="customize-icon-preview" data-icon-preview="history" aria-hidden="true">—</div>
+              <div class="customize-icon-meta"><strong>History</strong></div>
+              <label class="button button-secondary button-small">Upload<input id="icon-upload-history" class="visually-hidden" type="file" accept="image/svg+xml,.svg"></label>
+              <button class="button button-ghost button-small" id="icon-clear-history" type="button">Clear</button>
+            </div>
+            <div class="customize-icon-row" data-icon-key="insights">
+              <div class="customize-icon-preview" data-icon-preview="insights" aria-hidden="true">—</div>
+              <div class="customize-icon-meta"><strong>Insights</strong></div>
+              <label class="button button-secondary button-small">Upload<input id="icon-upload-insights" class="visually-hidden" type="file" accept="image/svg+xml,.svg"></label>
+              <button class="button button-ghost button-small" id="icon-clear-insights" type="button">Clear</button>
+            </div>
+            <div class="customize-icon-row" data-icon-key="notes">
+              <div class="customize-icon-preview" data-icon-preview="notes" aria-hidden="true">—</div>
+              <div class="customize-icon-meta"><strong>Notes</strong></div>
+              <label class="button button-secondary button-small">Upload<input id="icon-upload-notes" class="visually-hidden" type="file" accept="image/svg+xml,.svg"></label>
+              <button class="button button-ghost button-small" id="icon-clear-notes" type="button">Clear</button>
+            </div>
+            <div class="customize-icon-row" data-icon-key="todos">
+              <div class="customize-icon-preview" data-icon-preview="todos" aria-hidden="true">—</div>
+              <div class="customize-icon-meta"><strong>To-Do</strong></div>
+              <label class="button button-secondary button-small">Upload<input id="icon-upload-todos" class="visually-hidden" type="file" accept="image/svg+xml,.svg"></label>
+              <button class="button button-ghost button-small" id="icon-clear-todos" type="button">Clear</button>
+            </div>
+            <div class="customize-icon-row" data-icon-key="customize">
+              <div class="customize-icon-preview" data-icon-preview="customize" aria-hidden="true">—</div>
+              <div class="customize-icon-meta"><strong>Customize</strong></div>
+              <label class="button button-secondary button-small">Upload<input id="icon-upload-customize" class="visually-hidden" type="file" accept="image/svg+xml,.svg"></label>
+              <button class="button button-ghost button-small" id="icon-clear-customize" type="button">Clear</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel customize-panel customize-pack">
+          <div class="customize-pack-bar">
+            <div>
+              <p class="eyebrow">YOUR LOOK</p>
+              <h2>Backup your style</h2>
+              <p class="customize-pack-hint">Keep colors, font, and nav icons together — or start fresh.</p>
+            </div>
+            <div class="customize-pack-actions">
+              <button
+                class="button button-primary button-small"
+                id="customize-export-btn"
+                type="button"
+                title="Download a JSON file with your colors, font, and custom nav icons so you can keep a backup or move them to another browser."
+                aria-label="Save look. Download a JSON file with your colors, font, and custom nav icons."
+              >Save look</button>
+              <label
+                class="button button-secondary button-small"
+                title="Choose a previously saved look file to replace your current colors, font, and nav icons."
+                aria-label="Load look. Choose a previously saved look file."
+              >Load look<input id="customize-import-input" class="visually-hidden" type="file" accept="application/json,.json"></label>
+              <button
+                class="button button-ghost button-small"
+                id="customize-reset-btn"
+                type="button"
+                title="Clear custom colors, font, and icons and return to the active theme preset."
+                aria-label="Reset to theme. Clear custom colors, font, and icons."
+              >Reset to theme</button>
+            </div>
+          </div>
         </section>
       </div>
     </section>
 
     <footer class="site-footer" id="about">
-      <div class="footer-main">
-        <div class="footer-brand">
-          <p class="footer-about"><strong>Locked-In</strong> is a private, browser-only focus timer. No account. No cloud sync. Your data stays on this device.</p>
-          <p class="footer-tagline">Built for deliberate work.</p>
+      <div class="footer-bar">
+        <div class="footer-left">
+          <p class="footer-copy">© <span id="current-year"></span> Locked-In<span class="footer-dot" aria-hidden="true">·</span>Built for deliberate work</p>
+          <nav class="footer-feedback" aria-label="Feedback">
+            <a href="https://github.com/0marii/locked-in/issues/new?labels=enhancement&" target="_blank" rel="noopener noreferrer">Feature<span aria-hidden="true"> ↗</span></a>
+            <span class="footer-dot" aria-hidden="true">·</span>
+            <a href="https://github.com/0marii/locked-in/issues/new?labels=bug&" target="_blank" rel="noopener noreferrer">Bug<span aria-hidden="true"> ↗</span></a>
+          </nav>
         </div>
-        <nav class="footer-feedback" aria-label="Feedback and contact">
-          <a href="https://github.com/0marii/locked-in/issues/new?labels=enhancement&" target="_blank" rel="noopener noreferrer">Request a feature <span aria-hidden="true">↗</span></a>
-          <a href="https://github.com/0marii/locked-in/issues/new?labels=bug&" target="_blank" rel="noopener noreferrer">Report a bug <span aria-hidden="true">↗</span></a>
-        </nav>
-      </div>
-      <div class="footer-meta">
-        <p class="footer-copy">© <span id="current-year"></span> Locked-In</p>
         <div class="creator-credit">
           <span>Made by <a href="https://github.com/0marii" target="_blank" rel="noopener noreferrer">Mohammad Al-Omari</a></span>
           <div class="social-links" aria-label="Social links">
-            <a class="social" href="https://jo.linkedin.com/in/alomari-se" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5.2 3.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM3.4 9.4H7v11.2H3.4zM9.2 9.4h3.4v1.5h.1a3.7 3.7 0 0 1 3.3-1.8c3.5 0 4.2 2.2 4.2 5.1v6.4h-3.6v-5.7c0-1.4 0-3.1-1.9-3.1s-2.1 1.5-2.1 3v5.8H9.2z"/></svg></a>
-            <a class="social" href="https://github.com/0marii" aria-label="GitHub" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.5-1.3-1.3-1.6-1.3-1.6-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.3.8 1 .8 2v3c0 .4.2.7.8.6A11.1 11.1 0 0 0 12 .9Z"/></svg></a>
-            <a class="social" href="https://omari.vercel.app/" aria-label="Portfolio" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 4.2L18.1 18H5.9L12 6.2Z"/></svg></a>
-            <a class="social" href="mailto:mo.omari862@gmail.com" aria-label="Email"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M2 5h20v14H2V5Zm2 2v.5l8 5.3 8-5.3V7l-8 5.2L4 7Z"/></svg></a>
+            <a class="social" href="https://jo.linkedin.com/in/alomari-se" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M5.2 3.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM3.4 9.4H7v11.2H3.4zM9.2 9.4h3.4v1.5h.1a3.7 3.7 0 0 1 3.3-1.8c3.5 0 4.2 2.2 4.2 5.1v6.4h-3.6v-5.7c0-1.4 0-3.1-1.9-3.1s-2.1 1.5-2.1 3v5.8H9.2z"/></svg></a>
+            <a class="social" href="https://github.com/0marii" aria-label="GitHub" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.5-1.3-1.3-1.6-1.3-1.6-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.3.8 1 .8 2v3c0 .4.2.7.8.6A11.1 11.1 0 0 0 12 .9Z"/></svg></a>
+            <a class="social" href="https://omari.vercel.app/" aria-label="Portfolio" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 4.2L18.1 18H5.9L12 6.2Z"/></svg></a>
+            <a class="social" href="mailto:mo.omari862@gmail.com" aria-label="Email"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M2 5h20v14H2V5Zm2 2v.5l8 5.3 8-5.3V7l-8 5.2L4 7Z"/></svg></a>
           </div>
         </div>
       </div>
@@ -725,8 +949,13 @@
   </dialog>
   <dialog class="edit-session-dialog view-notes-dialog" id="view-session-notes-dialog" aria-labelledby="view-session-notes-heading">
     <div class="edit-session-content view-notes-content">
-      <p class="eyebrow">SESSION NOTES</p>
-      <h2 id="view-session-notes-heading">Notes</h2>
+      <div class="view-notes-header">
+        <div>
+          <p class="eyebrow">SESSION NOTES</p>
+          <h2 id="view-session-notes-heading">Notes</h2>
+        </div>
+        <button class="dialog-close-btn" id="view-session-notes-x" type="button" aria-label="Close session notes" title="Close">✕</button>
+      </div>
       <p class="edit-note-context" id="view-session-notes-meta"></p>
       <div id="view-session-notes-list" class="view-session-notes-list"></div>
       <div class="field view-notes-add">

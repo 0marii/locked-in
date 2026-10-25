@@ -1,17 +1,33 @@
-import { ACTIVE_SESSION_KEY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=78";
-import { dom, state, tabId } from "./runtime.js?v=78";
-import { safeRead, safeWrite } from "./storage.js?v=78";
-import { showToast } from "./toast.js?v=78";
-import { normalizePomodoroMinutes } from "./utils.js?v=78";
-import { initSync } from "./sync.js?v=78";
-import { closeMenu, closeThemePopover, initTheme, navigate, screenMap, toggleMenu } from "./theme-nav.js?v=78";
-import { applyPrefsToDom, loadData, markFocusGoalsEdited, readGoalMinutesFromDom, renderSetup, resetSetupFormDefaults, restoreFocusGoalsDefault, saveFocusGoalsFromDom, savePrefs, selectedChimeMode, setPrefsPanelOpen, syncChimeHint, syncGoalEditor, syncHardcoreHint, syncPomodoroIntervalVisibility, syncSetupWidgetVisibility, syncTagCustomVisibility } from "./setup.js?v=78";
-import { activeFocusSeconds, addStickyNote, closeEndSessionDialog, finishSession, requestNotificationPermission, requestWakeLock, restoreActiveSession, setStickyNotesOpen, setStickyState, startSession, startTimerLoop, stopSession, tick, toggleBreak } from "./session.js?v=78";
-import { addNoteToViewedSession, addReportNote, clearHistory, clearHistoryFilters, closeSessionNotesViewer, deleteSession, exportCsv, exportJson, importJson, initDatePickers, initHistoryTableScrollHint, openNotesFilteredToSession, openSessionNotesViewer, renderHistory, saveEdit, saveReportNotes, syncHistoryTableScroll } from "./history.js?v=78";
-import { downloadWeekCard, renderInsights } from "./insights.js?v=78";
-import { addInboxNote, clearNotesSessionFilter, closeOpenNoteMenus, createNoteOptionsMenu, deleteEditedNote, renderNotes, saveEditedNote } from "./notes.js?v=78";
+import { ACTIVE_SESSION_KEY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=140";
+import { dom, state, tabId } from "./runtime.js?v=140";
+import { safeRead, safeWrite } from "./storage.js?v=140";
+import { showToast } from "./toast.js?v=140";
+import { formatShortDate, normalizePomodoroMinutes } from "./utils.js?v=140";
+import { initSync } from "./sync.js?v=140";
+import { askConfirm, closeMenu, closeThemePopover, initTheme, navigate, screenMap, toggleMenu } from "./theme-nav.js?v=140";
+import { bindCustomizeEvents, initCustomize } from "./customize.js?v=140";
+import { applyPrefsToDom, loadData, markFocusGoalsEdited, readGoalMinutesFromDom, renderFocusGoals, renderSetup, resetSetupFormDefaults, restoreFocusGoalsDefault, saveFocusGoalsFromDom, savePrefs, selectedChimeMode, setPrefsPanelOpen, syncChimeHint, syncGoalEditor, syncHardcoreHint, syncPomodoroIntervalVisibility, syncSetupWidgetVisibility, syncTagCustomVisibility } from "./setup.js?v=140";
+import { activeFocusSeconds, addStickyNote, closeEndSessionDialog, finishSession, requestNotificationPermission, requestWakeLock, restoreActiveSession, setStickyNotesOpen, setStickyState, startSession, startTimerLoop, stopSession, tick, toggleBreak } from "./session.js?v=140";
+import { addNoteToViewedSession, addReportNote, clearHistory, clearHistoryFilters, closeSessionNotesViewer, deleteSession, exportCsv, exportJson, importJson, initDatePickers, initHistoryTableScrollHint, openHistoryForDay, openNotesFilteredToSession, openSessionNotesViewer, renderHistory, saveEdit, saveReportNotes, syncHistoryTableScroll } from "./history.js?v=140";
+import { downloadWeekCard, renderInsights } from "./insights.js?v=140";
+import { addInboxNote, clearNotesSessionFilter, closeOpenNoteMenus, createNoteOptionsMenu, deleteEditedNote, renderNotes, saveEditedNote } from "./notes.js?v=140";
+import { bindTodoEvents, renderTodos } from "./todos.js?v=140";
+import { bindWeekReportEvents, renderWeekReports, resetWeekNow } from "./week-reports.js?v=140";
 
-export function renderAll(){renderSetup();renderHistory();renderInsights();renderNotes();}
+function confirmResetWeekNow() {
+  askConfirm(
+    "Reset this week now?",
+    "Weekly progress starts fresh and a performance report is saved. Session history and todos are not deleted.",
+    () => {
+      resetWeekNow({ notify: true });
+      renderFocusGoals();
+      renderWeekReports();
+    },
+    "Reset week"
+  );
+}
+
+export function renderAll(){renderSetup();renderHistory();renderInsights();renderNotes();renderTodos();}
 
 export function handleKeyboard(e) {
   const target=e.target, tag=target?.tagName?.toLowerCase();
@@ -172,6 +188,11 @@ export function bindEvents() {
     syncSetupWidgetVisibility();
     if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
   });
+  dom.prefShowSetupTodos?.addEventListener("change", () => {
+    state.prefs.showSetupTodos = dom.prefShowSetupTodos.checked;
+    syncSetupWidgetVisibility();
+    if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
+  });
   dom.prefChimeInputs.forEach((input) => {
     input.addEventListener("change", () => {
       state.prefs.chime = selectedChimeMode();
@@ -187,6 +208,19 @@ export function bindEvents() {
     navigate("insights-screen");
     dom.heatmap?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   });
+  const onHeatmapDayClick = (event) => {
+    const cell = event.target.closest("button.heat-cell[data-day]");
+    if (!cell) return;
+    event.preventDefault();
+    const day = cell.dataset.day;
+    if (cell.dataset.level === "0") {
+      showToast(`No activity on ${formatShortDate(day)}.`);
+      return;
+    }
+    openHistoryForDay(day);
+  };
+  dom.heatmap?.addEventListener("click", onHeatmapDayClick);
+  dom.setupHeatmap?.addEventListener("click", onHeatmapDayClick);
   const bindGoalEditor = (kind) => {
     const slider = kind === "daily" ? dom.goalDailySlider : dom.goalWeeklySlider;
     const hours = kind === "daily" ? dom.goalDailyHours : dom.goalWeeklyHours;
@@ -207,10 +241,14 @@ export function bindEvents() {
   };
   bindGoalEditor("daily");
   bindGoalEditor("weekly");
+  dom.goalWeekStartsOn?.addEventListener("change", markFocusGoalsEdited);
+  dom.resetWeekNowBtn?.addEventListener("click", confirmResetWeekNow);
   dom.saveFocusGoalsBtn?.addEventListener("click", saveFocusGoalsFromDom);
+  bindWeekReportEvents();
   if (dom.focusGoalsOptions && !dom.focusGoalsOptions.childElementCount) {
     const menu = createNoteOptionsMenu([
       { label: "Restore default", onClick: restoreFocusGoalsDefault },
+      { label: "Reset week now", onClick: confirmResetWeekNow },
       { label: "Download week card", onClick: downloadWeekCard }
     ]);
     const toggle = menu.querySelector(".note-options-toggle");
@@ -220,7 +258,21 @@ export function bindEvents() {
     }
     dom.focusGoalsOptions.append(menu);
   }
-  dom.exportCsvBtn.addEventListener("click",exportCsv);dom.exportJsonBtn.addEventListener("click",exportJson);dom.importJsonInput.addEventListener("change",()=>importJson(dom.importJsonInput.files?.[0]));dom.clearHistoryBtn.addEventListener("click",clearHistory);
+  if (dom.historyActions && !dom.historyActions.childElementCount) {
+    const menu = createNoteOptionsMenu([
+      { label: "Download spreadsheet", onClick: exportCsv },
+      { label: "Save backup", onClick: exportJson },
+      { label: "Restore backup", onClick: () => dom.importJsonInput?.click() },
+      { label: "Clear all history", danger: true, onClick: clearHistory }
+    ]);
+    const toggle = menu.querySelector(".note-options-toggle");
+    if (toggle) {
+      toggle.setAttribute("aria-label", "History actions");
+      toggle.title = "History actions";
+    }
+    dom.historyActions.append(menu);
+  }
+  dom.importJsonInput?.addEventListener("change", () => importJson(dom.importJsonInput.files?.[0]));
   dom.reportTopic.addEventListener("input",()=>{state.reportDirty=true;dom.reportSaveState.textContent="Unsaved changes";});
   dom.reportNoteInput?.addEventListener("input",()=>{
     if (String(dom.reportNoteInput.value || "").trim()) {
@@ -260,6 +312,7 @@ export function bindEvents() {
     openSessionNotesViewer(id);
   });
   dom.viewNotesClose?.addEventListener("click", closeSessionNotesViewer);
+  dom.viewNotesCloseX?.addEventListener("click", closeSessionNotesViewer);
   dom.viewNotesDialog?.addEventListener("close", () => { state.viewingNotesId = null; });
   dom.viewNoteAdd?.addEventListener("click", addNoteToViewedSession);
   dom.viewNoteInput?.addEventListener("keydown", (e) => {
@@ -291,7 +344,7 @@ export function bindEvents() {
 }
 
 export function init() {
-  loadData();initTheme();applyPrefsToDom();syncTagCustomVisibility();bindEvents();initSync();
+  loadData();initTheme();initCustomize();applyPrefsToDom();syncTagCustomVisibility();bindEvents();bindCustomizeEvents();bindTodoEvents();initSync();
   try{dom.keyboardShortcuts.checked=localStorage.getItem("locked_in_keyboard_shortcuts")!=="false";}catch(_){}
   dom.keyboardShortcuts.addEventListener("change",()=>{try{localStorage.setItem("locked_in_keyboard_shortcuts",String(dom.keyboardShortcuts.checked));}catch(_){}});
   dom.currentYear.textContent=new Date().getFullYear();

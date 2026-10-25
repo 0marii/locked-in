@@ -81,22 +81,6 @@
   min-width: 0;
   margin: 0;
   text-align: left;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  transition: border-color .15s ease, transform .15s ease;
-}
-
-.setup-heatmap-panel:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  transform: translateY(-1px);
-}
-
-.setup-heatmap-panel:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
 }
 
 .setup-heatmap-panel .panel-heading {
@@ -115,10 +99,23 @@
 
 .setup-heatmap-go {
   flex: 0 0 auto;
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
   color: var(--accent);
   font: 700 11px var(--font);
   letter-spacing: .02em;
   white-space: nowrap;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.setup-heatmap-go:hover,
+.setup-heatmap-go:focus-visible {
+  color: var(--accent-strong, var(--accent));
+  outline: none;
 }
 
 .setup-heatmap-note {
@@ -126,24 +123,6 @@
   text-align: left;
   max-width: none;
 }
-
-.setup-heatmap-panel .heatmap-frame {
-  pointer-events: none;
-}
-
-.note-panel { padding: 27px; background: var(--surface-raised); }
-
-.note-symbol { display: grid; place-items: center; width: 44px; height: 44px; margin: 27px 0 18px; background: var(--accent); color: var(--accent-ink); border-radius: 13px; font-size: 26px; }
-
-.note-panel h2 { margin: 0 0 12px; font-size: clamp(28px, 3vw, 37px); line-height: 1.04; letter-spacing: -.07em; }
-
-.note-panel > p:not(.eyebrow) { margin: 0; color: var(--text-muted); font-size: 13px; }
-
-.note-divider { height: 1px; margin: 26px 0 17px; background: var(--border); }
-
-.mini-stat { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; color: var(--text-muted); font-size: 11px; }
-
-.mini-stat strong { color: var(--text); font: 700 13px var(--mono); }
 
 .tip-card {
   display: flex;

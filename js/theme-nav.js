@@ -1,15 +1,17 @@
-import { THEME_KEY } from "./constants.js?v=78";
-import { dom, state } from "./runtime.js?v=78";
-import { safeWrite } from "./storage.js?v=78";
-import { renderSetup } from "./setup.js?v=78";
-import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=78";
-import { closeDatePicker, renderHistory } from "./history.js?v=78";
-import { renderInsights } from "./insights.js?v=78";
-import { renderNotes } from "./notes.js?v=78";
+import { THEME_KEY } from "./constants.js?v=140";
+import { dom, state } from "./runtime.js?v=140";
+import { safeWrite } from "./storage.js?v=140";
+import { renderSetup } from "./setup.js?v=140";
+import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=140";
+import { closeDatePicker, renderHistory } from "./history.js?v=140";
+import { renderInsights } from "./insights.js?v=140";
+import { renderNotes } from "./notes.js?v=140";
+import { renderCustomize, switchToPresetTheme } from "./customize.js?v=140";
+import { renderTodos } from "./todos.js?v=140";
 
 export const screenMap = {
   timer: "timer-screen", history: "history-screen", insights: "insights-screen", notes: "notes-screen",
-  report: "report-screen", setup: "setup-screen"
+  todos: "todos-screen", customize: "customize-screen", report: "report-screen", setup: "setup-screen"
 };
 
 
@@ -48,11 +50,13 @@ export function proceedNavigate(id, replace = false) {
   if (id === "history-screen") renderHistory();
   if (id === "insights-screen") renderInsights();
   if (id === "notes-screen") renderNotes();
+  if (id === "todos-screen") renderTodos();
+  if (id === "customize-screen") renderCustomize();
   if (id === "timer-screen" && state.session) renderTimer();
   syncStickyNotesUi();
   syncFloatingTimer();
   if (id !== "timer-screen") safeWrite("locked_in_last_screen", id);
-  const title = { "setup-screen": "Locked-In — Focus Timer", "timer-screen": "Focus session · Locked-In", "report-screen": "Session report · Locked-In", "history-screen": "History · Locked-In", "insights-screen": "Insights · Locked-In", "notes-screen": "Notes · Locked-In" }[id];
+  const title = { "setup-screen": "Locked-In — Focus Timer", "timer-screen": "Focus session · Locked-In", "report-screen": "Session report · Locked-In", "history-screen": "History · Locked-In", "insights-screen": "Insights · Locked-In", "notes-screen": "Notes · Locked-In", "todos-screen": "To-Do · Locked-In", "customize-screen": "Customize · Locked-In" }[id];
   document.title = title || "Locked-In";
   const heading = document.querySelector(`#${id} h1`);
   if (heading) {
@@ -86,22 +90,47 @@ export function navigate(id, replace = false) {
   proceedNavigate(id, replace);
 }
 
-export function setTheme(theme, persist = true) {
-  const themes = ["dark", "light", "forest", "violet", "pink", "blue"];
-  const chosen = themes.includes(theme) ? theme : "dark";
-  document.documentElement.dataset.theme = chosen;
-  dom.themeButton.setAttribute("aria-label", `Theme: ${chosen}. Open theme picker`);
-  dom.themeButton.querySelector(".theme-name").textContent = chosen[0].toUpperCase() + chosen.slice(1);
-  dom.themePopover.querySelectorAll("[data-theme]").forEach((button) => {
-    const active = button.dataset.theme === chosen;
+function isCustomThemeActive() {
+  return state.customizePack?.mode === "custom";
+}
+
+/** Keep theme button + popover in sync with preset vs Custom mode. */
+export function syncThemePicker(chosen = document.documentElement.dataset.theme || "dark") {
+  const custom = isCustomThemeActive();
+  const label = custom ? "Custom" : chosen[0].toUpperCase() + chosen.slice(1);
+  dom.themeButton?.setAttribute("aria-label", `Theme: ${label}. Open theme picker`);
+  const name = dom.themeButton?.querySelector(".theme-name");
+  if (name) name.textContent = label;
+  dom.themePopover?.querySelectorAll("[data-theme]").forEach((button) => {
+    const active = custom ? button.dataset.theme === "custom" : button.dataset.theme === chosen;
     button.classList.toggle("is-selected", active);
     button.setAttribute("aria-checked", String(active));
     button.tabIndex = active ? 0 : -1;
   });
+}
+
+export function openCustomizeFromTheme() {
+  closeThemePopover();
+  navigate("customize-screen");
+}
+
+export function setTheme(theme, persist = true) {
+  if (theme === "custom") {
+    openCustomizeFromTheme();
+    syncThemePicker(document.documentElement.dataset.theme || "dark");
+    return;
+  }
+  const themes = ["dark", "light", "forest", "violet", "pink", "blue"];
+  const chosen = themes.includes(theme) ? theme : "dark";
+  document.documentElement.dataset.theme = chosen;
+  // Preset selection clears custom color overrides (icons are kept).
+  if (persist) switchToPresetTheme();
+  syncThemePicker(chosen);
   if (persist) { try { localStorage.setItem(THEME_KEY, chosen); } catch (_) {} }
   const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg || "#101310");
   if (state.activeScreen === "insights-screen") renderInsights();
+  if (state.activeScreen === "customize-screen") renderCustomize();
 }
 
 export function closeThemePopover() {
@@ -114,6 +143,9 @@ export function initTheme() {
   try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
   const system = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   setTheme(saved || system, false);
+  document.addEventListener("locked-in:customize-mode", () => {
+    syncThemePicker(document.documentElement.dataset.theme || "dark");
+  });
   const themeButtons = [...dom.themePopover.querySelectorAll("[data-theme]")];
   const syncThemeTabStops = () => {
     themeButtons.forEach((button) => {
@@ -131,7 +163,13 @@ export function initTheme() {
     }
   });
   themeButtons.forEach((b) => b.addEventListener("click", () => {
-    setTheme(b.dataset.theme); closeThemePopover(); dom.themeButton.focus();
+    if (b.dataset.theme === "custom") {
+      openCustomizeFromTheme();
+      return;
+    }
+    setTheme(b.dataset.theme);
+    closeThemePopover();
+    dom.themeButton.focus();
   }));
   dom.themePopover.addEventListener("keydown", (e) => {
     if (!dom.themePopover.classList.contains("is-open")) return;
@@ -144,13 +182,19 @@ export function initTheme() {
     else if (e.key === "End") { e.preventDefault(); next = themeButtons.length - 1; }
     else if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
-      setTheme(themeButtons[current].dataset.theme);
-      closeThemePopover();
-      dom.themeButton.focus();
+      const theme = themeButtons[current].dataset.theme;
+      if (theme === "custom") openCustomizeFromTheme();
+      else {
+        setTheme(theme);
+        closeThemePopover();
+        dom.themeButton.focus();
+      }
       return;
     } else return;
-    setTheme(themeButtons[next].dataset.theme);
-    syncThemeTabStops();
+    const nextTheme = themeButtons[next].dataset.theme;
+    // Preview presets while browsing; Custom only activates on Enter/click.
+    if (nextTheme !== "custom") setTheme(nextTheme);
+    else syncThemeTabStops();
     themeButtons[next].focus();
   });
   document.addEventListener("click", (e) => {

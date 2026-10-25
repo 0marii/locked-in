@@ -11,12 +11,13 @@ const read = (name) => fs.readFileSync(path.join(root, name), "utf8");
 const JS_MODULES = [
   "constants.js", "runtime.js", "storage.js", "toast.js", "utils.js",
   "sync.js", "theme-nav.js", "setup.js", "session.js", "history.js",
-  "insights.js", "notes.js", "bind.js"
+  "insights.js", "notes.js", "todos.js", "customize.js", "bind.js"
 ];
 
 const CSS_MODULES = [
   "tokens.css", "base.css", "layout.css", "components.css", "setup.css",
-  "timer.css", "report.css", "history.css", "insights.css", "notes.css"
+  "timer.css", "report.css", "history.css", "insights.css", "notes.css",
+  "todos.css", "customize.css"
 ];
 
 const ASSET_FILES = [
@@ -95,12 +96,12 @@ test("manifest and service worker use relative scope", () => {
 
 test("screen IDs match navigation data-screen targets", () => {
   const html = read("index.html");
-  const screens = [...html.matchAll(/id="((?:setup|timer|report|history|insights|notes)-screen)"/g)].map((m) => m[1]);
-  const nav = [...html.matchAll(/data-screen="((?:setup|timer|report|history|insights|notes)-screen)"/g)].map((m) => m[1]);
-  for (const id of ["setup-screen", "timer-screen", "history-screen", "insights-screen", "notes-screen"]) {
+  const screens = [...html.matchAll(/id="((?:setup|timer|report|history|insights|notes|todos|customize)-screen)"/g)].map((m) => m[1]);
+  const nav = [...html.matchAll(/data-screen="((?:setup|timer|report|history|insights|notes|todos|customize)-screen)"/g)].map((m) => m[1]);
+  for (const id of ["setup-screen", "timer-screen", "history-screen", "insights-screen", "notes-screen", "todos-screen"]) {
     assert.ok(screens.includes(id), `missing screen ${id}`);
   }
-  for (const id of ["setup-screen", "history-screen", "insights-screen", "notes-screen"]) {
+  for (const id of ["setup-screen", "history-screen", "insights-screen", "notes-screen", "todos-screen"]) {
     assert.ok(nav.includes(id), `missing nav target ${id}`);
   }
   assert.ok(html.includes('id="heatmap"') && html.includes('id="heatmap-text"'));
@@ -117,7 +118,8 @@ test("app sources expose storage keys and honest save helpers", () => {
     "locked_in_notes_inbox_v1",
     "locked_in_prefs_v1",
     "locked_in_recent_goals_v1",
-    "locked_in_focus_goals_v1"
+    "locked_in_focus_goals_v1",
+    "locked_in_todos_v1"
   ]) {
     assert.ok(js.includes(key), `missing storage key ${key}`);
   }

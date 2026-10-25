@@ -1,12 +1,12 @@
-import { NOTES_INBOX_KEY } from "./constants.js?v=78";
-import { dom, state, tabId } from "./runtime.js?v=78";
-import { safeWrite } from "./storage.js?v=78";
-import { showToast } from "./toast.js?v=78";
-import { download, formatDate, noteFilename } from "./utils.js?v=78";
-import { broadcast } from "./sync.js?v=78";
-import { askConfirm } from "./theme-nav.js?v=78";
-import { deleteStickyNote, persistSessionNotes, renderStickyNoteList, syncStickyNotesUi } from "./session.js?v=78";
-import { renderHistory, renderReportNotesList, renderSessionNotesViewer, saveHistory, updateEditNotesSummary } from "./history.js?v=78";
+import { NOTES_INBOX_KEY } from "./constants.js?v=140";
+import { dom, state, tabId } from "./runtime.js?v=140";
+import { safeWrite } from "./storage.js?v=140";
+import { showToast } from "./toast.js?v=140";
+import { download, formatDate, noteFilename } from "./utils.js?v=140";
+import { broadcast } from "./sync.js?v=140";
+import { askConfirm } from "./theme-nav.js?v=140";
+import { deleteStickyNote, persistSessionNotes, renderStickyNoteList, syncStickyNotesUi } from "./session.js?v=140";
+import { renderHistory, renderReportNotesList, renderSessionNotesViewer, saveHistory, updateEditNotesSummary } from "./history.js?v=140";
 
 export function ensureNoteItems(session) {
   if (!session) return [];
@@ -339,8 +339,6 @@ export function renderNotes() {
       group.items.forEach((item, index) => {
         const li = document.createElement("li");
         li.className = "session-note-item";
-        const label = document.createElement("strong");
-        label.textContent = `Note ${index + 1}`;
         const p = document.createElement("p");
         p.textContent = item.text;
         const foot = document.createElement("div");
@@ -372,8 +370,8 @@ export function renderNotes() {
             deleteEditedNote();
           }
         }));
-        foot.append(time, actions);
-        li.append(label, p, foot);
+        foot.append(time);
+        li.append(p, foot, actions);
         list.append(li);
       });
       card.append(list);
@@ -391,7 +389,7 @@ export function renderNotes() {
   } else if (!state.inbox.length) {
     const empty = document.createElement("div");
     empty.className = "notes-empty-state";
-    empty.innerHTML = "<strong>No quick thoughts yet</strong><p>Use Quick capture above to save a thought without an active session.</p>";
+    empty.innerHTML = "<strong>Inbox is empty</strong><p>Use Quick note above to save a thought anytime.</p>";
     dom.notesInbox.append(empty);
   } else if (!inboxRows.length) {
     const empty = document.createElement("div");

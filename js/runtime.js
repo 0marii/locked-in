@@ -1,5 +1,5 @@
 /** Shared DOM refs and mutable app state. */
-import { DEFAULT_POMODORO_MINUTES } from "./constants.js?v=78";
+import { DEFAULT_POMODORO_MINUTES } from "./constants.js?v=140";
 
 const $ = (id) => document.getElementById(id);
 
@@ -19,13 +19,20 @@ export function bindDom() {
     prefNotifyEnd: $("pref-notify-end"), prefNotifyBreak: $("pref-notify-break"), prefPomodoro: $("pref-pomodoro"),
     prefPomodoroMinutes: $("pref-pomodoro-minutes"), prefPomodoroIntervalWrap: $("pref-pomodoro-interval-wrap"),
     prefShowSetupGoal: $("pref-show-setup-goal"), prefShowSetupHeatmap: $("pref-show-setup-heatmap"),
+    prefShowSetupTodos: $("pref-show-setup-todos"),
     prefsPanel: $("prefs-panel"), prefsToggleBtn: $("prefs-toggle-btn"), prefsBody: $("prefs-body"),
+    setupTodosWidget: $("setup-todos-widget"), setupTodosOpenBtn: $("setup-todos-open-btn"),
+    setupTodosHeadline: $("setup-todos-headline"),
+    setupTodosMyDay: $("setup-todos-myday"), setupTodosOverdue: $("setup-todos-overdue"),
+    setupTodosOpen: $("setup-todos-open"), setupTodosHint: $("setup-todos-hint"),
+    setupTodosPreview: $("setup-todos-preview"), setupTodosSource: $("setup-todos-source"),
+    todosRail: $("todos-rail"), todosMain: $("todos-main"),
     prefChime: $("pref-chime"), prefChimeHint: $("pref-chime-hint"),
     prefChimeInputs: [...document.querySelectorAll('input[name="pref-chime"]')],
     setupFocusGoalCard: $("setup-focus-goal-card"),
     setupDailyProgressLabel: $("setup-daily-progress-label"), setupDailyProgressBar: $("setup-daily-progress-bar"),
     setupWeeklyProgressHint: $("setup-weekly-progress-hint"), setupEditGoalsBtn: $("setup-edit-goals-btn"),
-    setupHeatmapBtn: $("setup-heatmap-btn"),
+    setupHeatmapPanel: $("setup-heatmap-panel"), setupHeatmapBtn: $("setup-heatmap-btn"),
     goalDailySlider: $("goal-daily-slider"), goalDailyHours: $("goal-daily-hours"), goalDailyMins: $("goal-daily-mins"), goalDailyDisplay: $("goal-daily-display"),
     goalWeeklySlider: $("goal-weekly-slider"), goalWeeklyHours: $("goal-weekly-hours"), goalWeeklyMins: $("goal-weekly-mins"), goalWeeklyDisplay: $("goal-weekly-display"),
     insightsDailyProgressBar: $("insights-daily-progress-bar"), insightsDailyProgressLabel: $("insights-daily-progress-label"),
@@ -33,7 +40,10 @@ export function bindDom() {
     saveFocusGoalsBtn: $("save-focus-goals-btn"), focusGoalsActions: $("focus-goals-actions"),
     focusGoalsHint: $("focus-goals-hint"), focusGoalsPanel: $("focus-goals-panel"),
     focusGoalsOptions: $("focus-goals-options"), bestTag: $("best-tag"),
-    setupCompletedCount: $("setup-completed-count"), setupAllCount: $("setup-all-count"), setupTotalFocus: $("setup-total-focus"),
+    goalWeekStartsOn: $("goal-week-starts-on"), goalWeekResetHint: $("goal-week-reset-hint"),
+    goalWeekResetStatus: $("goal-week-reset-status"), resetWeekNowBtn: $("reset-week-now-btn"),
+    weekReportsPanel: $("week-reports-panel"), weekReportsList: $("week-reports-list"),
+    weekReportsEmpty: $("week-reports-empty"),
     activeSessionBanner: $("active-session-banner"), activeSessionLabel: $("active-session-label"), resumeSessionBtn: $("resume-session-btn"),
     floatingTimer: $("floating-timer"), floatingTimerBadge: $("floating-timer-badge"), floatingTimerStatus: $("floating-timer-status"),
     floatingTimerIntent: $("floating-timer-intent"), floatingTimerClock: $("floating-timer-clock"),
@@ -63,7 +73,8 @@ export function bindDom() {
     historyTableBody: $("history-table-body"), historyEmpty: $("history-empty"), historyStartBtn: $("history-start-btn"),
     historyTableShell: $("history-table-shell"), historyTableScroll: $("history-table-scroll"), historyScrollHint: $("history-scroll-hint"),
     historyTagFilter: $("history-tag-filter"), clearHistoryFiltersBtn: $("clear-history-filters-btn"),
-    exportCsvBtn: $("export-csv-btn"), exportJsonBtn: $("export-json-btn"), importJsonInput: $("import-json-input"), clearHistoryBtn: $("clear-history-btn"),
+    historyActions: $("history-actions"),
+    importJsonInput: $("import-json-input"),
     insightsStats: $("insights-stats"), insightsSummary: $("insights-summary"),
     insightsEmptyPatterns: $("insights-empty-patterns"), insightsEmptyTitle: $("insights-empty-title"),
     insightsEmptyCopy: $("insights-empty-copy"), insightsAnalyticsBody: $("insights-analytics-body"),
@@ -87,7 +98,13 @@ export function bindDom() {
     viewNotesMeta: $("view-session-notes-meta"), viewNotesList: $("view-session-notes-list"),
     viewNoteInput: $("view-session-note-input"), viewNoteAdd: $("view-session-note-add"),
     viewNotesOpenTab: $("view-session-notes-open-tab"), viewNotesClose: $("view-session-notes-close"),
-    backToTop: $("back-to-top"), currentYear: $("current-year")
+    viewNotesCloseX: $("view-session-notes-x"),
+    backToTop: $("back-to-top"), currentYear: $("current-year"),
+    colorWheel: $("color-wheel"), customizeColorHex: $("customize-color-hex"),
+    customizeColorValue: $("customize-color-value"),
+    customizeFontFamily: $("customize-font-family"), customizeModeLabel: $("customize-mode-label"),
+    customizeExportBtn: $("customize-export-btn"), customizeImportInput: $("customize-import-input"),
+    customizeResetBtn: $("customize-reset-btn")
   });
 }
 
@@ -119,14 +136,20 @@ export const state = {
     chime: "soft",
     panelOpen: false,
     showSetupGoal: true,
-    showSetupHeatmap: true
+    showSetupHeatmap: true,
+    showSetupTodos: true,
+    setupTodosSource: "focus"
   },
-  focusGoals: { dailyMinutes: 120, weeklyMinutes: 600 },
+  focusGoals: { dailyMinutes: 120, weeklyMinutes: 600, weekStartsOn: 1, activeWeekKey: null },
   focusGoalsDirty: false,
+  weekReports: [],
+  openWeekReportId: null,
+  customizePack: null,
+  todos: null,
   recentGoals: [],
   breakReminderTimer: null,
   pomodoroNotifiedBucket: -1,
-  datePicker: { field: null, viewYear: 0, viewMonth: 0, previousFocus: null },
+  datePicker: { field: null, viewYear: 0, viewMonth: 0, previousFocus: null, custom: null },
   historyScrollHinted: false
 };
 

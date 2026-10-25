@@ -1,5 +1,5 @@
-import { DEFAULT_POMODORO_MINUTES, GOAL_LIMITS, POMODORO_MINUTE_OPTIONS } from "./constants.js?v=78";
-import { state } from "./runtime.js?v=78";
+import { DEFAULT_POMODORO_MINUTES, GOAL_LIMITS, POMODORO_MINUTE_OPTIONS } from "./constants.js?v=140";
+import { state } from "./runtime.js?v=140";
 
 export function normalizePomodoroMinutes(value) {
   const mins = Math.floor(Number(value) || 0);
@@ -20,13 +20,42 @@ export function formatGoalClock(totalMinutes) {
   return `${h}h ${String(m).padStart(2, "0")}m`;
 }
 
-export function startOfWeek(date = new Date()) {
+/** 0 = Sunday … 6 = Saturday. Defaults to Monday (1) for existing installs. */
+export function normalizeWeekStartsOn(value) {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 0 && n <= 6 ? n : 1;
+}
+
+export function currentWeekStartsOn() {
+  return normalizeWeekStartsOn(state.focusGoals?.weekStartsOn);
+}
+
+export function startOfWeek(date = new Date(), weekStartsOn = currentWeekStartsOn()) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  const day = (d.getDay() + 6) % 7; // Monday = 0
-  d.setDate(d.getDate() - day);
+  const start = normalizeWeekStartsOn(weekStartsOn);
+  const diff = (d.getDay() - start + 7) % 7;
+  d.setDate(d.getDate() - diff);
   return d;
 }
+
+export function endOfWeek(date = new Date(), weekStartsOn = currentWeekStartsOn()) {
+  const start = startOfWeek(date, weekStartsOn);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+export const WEEKDAY_OPTIONS = [
+  { value: 0, label: "Sunday" },
+  { value: 1, label: "Monday" },
+  { value: 2, label: "Tuesday" },
+  { value: 3, label: "Wednesday" },
+  { value: 4, label: "Thursday" },
+  { value: 5, label: "Friday" },
+  { value: 6, label: "Saturday" }
+];
 
 export function formatClock(total, hours = false) {
   const s = Math.max(0, Math.floor(Number(total) || 0));

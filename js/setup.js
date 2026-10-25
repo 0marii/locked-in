@@ -1,10 +1,12 @@
-import { ACTIVE_SESSION_KEY, DEFAULT_POMODORO_MINUTES, FOCUS_GOALS_KEY, GOAL_LIMITS, HISTORY_KEY, LEGACY_HISTORY_KEYS, MAX_HISTORY, NOTES_INBOX_KEY, PREFS_KEY, RECENT_GOALS_KEY } from "./constants.js?v=78";
-import { dom, state } from "./runtime.js?v=78";
-import { safeRead, safeWrite } from "./storage.js?v=78";
-import { showToast } from "./toast.js?v=78";
-import { clampGoalMinutes, completedRecords, formatClock, formatDuration, formatGoalClock, normalizePomodoroMinutes, startOfWeek } from "./utils.js?v=78";
-import { normalizeRecord } from "./session.js?v=78";
-import { drawHeatmap } from "./insights.js?v=78";
+import { ACTIVE_SESSION_KEY, DEFAULT_POMODORO_MINUTES, FOCUS_GOALS_KEY, GOAL_LIMITS, HISTORY_KEY, LEGACY_HISTORY_KEYS, MAX_HISTORY, NOTES_INBOX_KEY, PREFS_KEY, RECENT_GOALS_KEY } from "./constants.js?v=140";
+import { dom, state } from "./runtime.js?v=140";
+import { safeRead, safeWrite } from "./storage.js?v=140";
+import { showToast } from "./toast.js?v=140";
+import { clampGoalMinutes, completedRecords, formatClock, formatDuration, formatGoalClock, formatShortDate, localDayKey, normalizePomodoroMinutes, normalizeWeekStartsOn, startOfWeek, WEEKDAY_OPTIONS } from "./utils.js?v=140";
+import { normalizeRecord } from "./session.js?v=140";
+import { drawHeatmap } from "./insights.js?v=140";
+import { loadTodos, renderSetupTodosWidget } from "./todos.js?v=140";
+import { currentProgressWindow, ensureWeekRollover, loadWeekReports, renderWeekReports } from "./week-reports.js?v=140";
 
 export const CHIME_HINTS = {
   off: "No sound when a session completes.",
@@ -30,7 +32,10 @@ export function loadData() {
   })).filter(n => n.text.trim()).slice(0, 200) : [];
   loadPrefs();
   loadFocusGoals();
+  loadWeekReports();
   loadRecentGoals();
+  loadTodos();
+  ensureWeekRollover({ notify: true });
 }
 
 export function pomodoroIntervalSeconds() {
@@ -57,7 +62,9 @@ export function loadPrefs() {
     chime: ["off", "soft", "full"].includes(p?.chime || legacyChime) ? (p?.chime || legacyChime) : "soft",
     panelOpen: Boolean(p?.panelOpen),
     showSetupGoal: p?.showSetupGoal !== false,
-    showSetupHeatmap: p?.showSetupHeatmap !== false
+    showSetupHeatmap: p?.showSetupHeatmap !== false,
+    showSetupTodos: p?.showSetupTodos !== false,
+    setupTodosSource: String(p?.setupTodosSource || "focus")
   };
 }
 
@@ -91,7 +98,8 @@ function setWidgetVisible(el, visible) {
 
 export function syncSetupWidgetVisibility() {
   setWidgetVisible(dom.setupFocusGoalCard, state.prefs.showSetupGoal !== false);
-  setWidgetVisible(dom.setupHeatmapBtn, state.prefs.showSetupHeatmap !== false);
+  setWidgetVisible(dom.setupHeatmapPanel || dom.setupHeatmapBtn, state.prefs.showSetupHeatmap !== false);
+  setWidgetVisible(dom.setupTodosWidget, state.prefs.showSetupTodos !== false);
 }
 
 export function applyPrefsToDom() {
@@ -101,6 +109,7 @@ export function applyPrefsToDom() {
   if (dom.prefPomodoroMinutes) dom.prefPomodoroMinutes.value = String(normalizePomodoroMinutes(state.prefs.pomodoroMinutes));
   if (dom.prefShowSetupGoal) dom.prefShowSetupGoal.checked = state.prefs.showSetupGoal !== false;
   if (dom.prefShowSetupHeatmap) dom.prefShowSetupHeatmap.checked = state.prefs.showSetupHeatmap !== false;
+  if (dom.prefShowSetupTodos) dom.prefShowSetupTodos.checked = state.prefs.showSetupTodos !== false;
   const chime = ["off", "soft", "full"].includes(state.prefs.chime) ? state.prefs.chime : "soft";
   dom.prefChimeInputs.forEach((input) => {
     input.checked = input.value === chime;
@@ -121,14 +130,49 @@ export function syncChimeHint() {
   dom.prefChimeHint.textContent = CHIME_HINTS[selectedChimeMode()] || CHIME_HINTS.soft;
 }
 
-export const DEFAULT_FOCUS_GOALS = { dailyMinutes: 120, weeklyMinutes: 600 };
+export const DEFAULT_FOCUS_GOALS = { dailyMinutes: 120, weeklyMinutes: 600, weekStartsOn: 1 };
 
 export function loadFocusGoals() {
   const g = safeRead(FOCUS_GOALS_KEY, null);
   state.focusGoals = {
     dailyMinutes: clampGoalMinutes("daily", g?.dailyMinutes ?? DEFAULT_FOCUS_GOALS.dailyMinutes),
-    weeklyMinutes: clampGoalMinutes("weekly", g?.weeklyMinutes ?? DEFAULT_FOCUS_GOALS.weeklyMinutes)
+    weeklyMinutes: clampGoalMinutes("weekly", g?.weeklyMinutes ?? DEFAULT_FOCUS_GOALS.weeklyMinutes),
+    weekStartsOn: normalizeWeekStartsOn(g?.weekStartsOn ?? DEFAULT_FOCUS_GOALS.weekStartsOn),
+    activeWeekKey: typeof g?.activeWeekKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(g.activeWeekKey)
+      ? g.activeWeekKey
+      : null
   };
+}
+
+export function readWeekStartsOnFromDom() {
+  const el = dom.goalWeekStartsOn || document.getElementById("goal-week-starts-on");
+  return normalizeWeekStartsOn(el?.value ?? state.focusGoals.weekStartsOn);
+}
+
+export function syncWeekStartsOnEditor(value = state.focusGoals.weekStartsOn) {
+  const el = dom.goalWeekStartsOn || document.getElementById("goal-week-starts-on");
+  const next = normalizeWeekStartsOn(value);
+  if (el) el.value = String(next);
+  updateWeekResetChrome(next);
+  return next;
+}
+
+export function updateWeekResetChrome(weekStartsOn = state.focusGoals.weekStartsOn) {
+  const next = normalizeWeekStartsOn(weekStartsOn);
+  const hint = dom.goalWeekResetHint || document.getElementById("goal-week-reset-hint");
+  if (hint) {
+    const label = WEEKDAY_OPTIONS.find((d) => d.value === next)?.label || "Monday";
+    hint.textContent = `Auto-resets every ${label}. History stays.`;
+  }
+  const status = dom.goalWeekResetStatus || document.getElementById("goal-week-reset-status");
+  if (status) {
+    const window = currentProgressWindow();
+    status.textContent = `Current window · since ${formatShortDateSafe(window.startKey)}`;
+  }
+}
+
+function formatShortDateSafe(iso) {
+  try { return formatShortDate(iso); } catch (_) { return iso; }
 }
 
 export function readGoalMinutesFromDom(kind) {
@@ -157,7 +201,7 @@ export function syncGoalEditor(kind, totalMinutes) {
   const sliderEl = kind === "daily" ? dom.goalDailySlider : dom.goalWeeklySlider;
   const displayEl = kind === "daily" ? dom.goalDailyDisplay : dom.goalWeeklyDisplay;
   if (hoursEl) hoursEl.value = String(hours);
-  if (minsEl) minsEl.value = String(mins);
+  if (minsEl) minsEl.value = String(mins).padStart(2, "0");
   if (sliderEl) {
     const sliderValue = Math.min(lim.sliderMax, Math.max(lim.min, total));
     sliderEl.value = String(sliderValue);
@@ -172,7 +216,9 @@ export function syncGoalEditor(kind, totalMinutes) {
 export function draftFocusGoalsFromDom() {
   return {
     dailyMinutes: syncGoalEditor("daily", readGoalMinutesFromDom("daily")),
-    weeklyMinutes: syncGoalEditor("weekly", readGoalMinutesFromDom("weekly"))
+    weeklyMinutes: syncGoalEditor("weekly", readGoalMinutesFromDom("weekly")),
+    weekStartsOn: syncWeekStartsOnEditor(readWeekStartsOnFromDom()),
+    activeWeekKey: state.focusGoals.activeWeekKey || null
   };
 }
 
@@ -198,26 +244,43 @@ export function setFocusGoalsDirty(dirty, { notify = false } = {}) {
 export function markFocusGoalsEdited() {
   const draft = draftFocusGoalsFromDom();
   const dirty = draft.dailyMinutes !== state.focusGoals.dailyMinutes
-    || draft.weeklyMinutes !== state.focusGoals.weeklyMinutes;
+    || draft.weeklyMinutes !== state.focusGoals.weeklyMinutes
+    || draft.weekStartsOn !== state.focusGoals.weekStartsOn;
   setFocusGoalsDirty(dirty, { notify: dirty });
 }
 
 export function saveFocusGoalsFromDom() {
+  const prevStartsOn = state.focusGoals.weekStartsOn;
   const next = draftFocusGoalsFromDom();
+  const scheduleChanged = next.weekStartsOn !== prevStartsOn;
+  // Changing reset day re-anchors the current week window without fabricating a report.
+  if (scheduleChanged) {
+    next.activeWeekKey = localDayKey(startOfWeek(new Date(), next.weekStartsOn));
+  } else {
+    next.activeWeekKey = state.focusGoals.activeWeekKey || localDayKey(startOfWeek(new Date(), next.weekStartsOn));
+  }
   state.focusGoals = next;
-  if (!safeWrite(FOCUS_GOALS_KEY, state.focusGoals)) {
+  if (!safeWrite(FOCUS_GOALS_KEY, {
+    dailyMinutes: next.dailyMinutes,
+    weeklyMinutes: next.weeklyMinutes,
+    weekStartsOn: next.weekStartsOn,
+    activeWeekKey: next.activeWeekKey
+  })) {
     showToast("Could not save focus goals — browser storage unavailable.");
     return false;
   }
   setFocusGoalsDirty(false);
   renderFocusGoals();
-  showToast("Focus goals saved.");
+  showToast(scheduleChanged
+    ? "Focus goals saved. Weekly reset day updated — history kept."
+    : "Focus goals saved.");
   return true;
 }
 
 export function restoreFocusGoalsDefault() {
   syncGoalEditor("daily", DEFAULT_FOCUS_GOALS.dailyMinutes);
   syncGoalEditor("weekly", DEFAULT_FOCUS_GOALS.weeklyMinutes);
+  syncWeekStartsOnEditor(DEFAULT_FOCUS_GOALS.weekStartsOn);
   markFocusGoalsEdited();
   showToast("Goals reset to 2h daily / 10h weekly. Save to apply.");
 }
@@ -301,16 +364,18 @@ export function completedFocusInRange(start, end) {
 }
 
 export function focusProgress() {
+  ensureWeekRollover({ notify: true });
   const now = new Date();
   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(todayStart); todayEnd.setHours(23, 59, 59, 999);
-  const weekStart = startOfWeek(now);
-  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6); weekEnd.setHours(23, 59, 59, 999);
+  const window = currentProgressWindow(now);
   return {
     dailySeconds: completedFocusInRange(todayStart, todayEnd),
-    weeklySeconds: completedFocusInRange(weekStart, weekEnd),
+    weeklySeconds: completedFocusInRange(window.start, window.end),
     dailyGoal: state.focusGoals.dailyMinutes * 60,
-    weeklyGoal: state.focusGoals.weeklyMinutes * 60
+    weeklyGoal: state.focusGoals.weeklyMinutes * 60,
+    weekStart: window.start,
+    weekEnd: window.end
   };
 }
 
@@ -327,12 +392,16 @@ export function renderFocusGoals() {
   if (!state.focusGoalsDirty) {
     syncGoalEditor("daily", state.focusGoals.dailyMinutes);
     syncGoalEditor("weekly", state.focusGoals.weeklyMinutes);
+    syncWeekStartsOnEditor(state.focusGoals.weekStartsOn);
+  } else {
+    updateWeekResetChrome(readWeekStartsOnFromDom());
   }
   if (dom.insightsDailyProgressBar) dom.insightsDailyProgressBar.style.width = `${dailyPct}%`;
   if (dom.insightsDailyProgressLabel) dom.insightsDailyProgressLabel.textContent = `${dailyLabel} today`;
   if (dom.insightsWeeklyProgressBar) dom.insightsWeeklyProgressBar.style.width = `${weeklyPct}%`;
   if (dom.insightsWeeklyProgressLabel) dom.insightsWeeklyProgressLabel.textContent = `${weeklyLabel} this week`;
   syncFocusGoalsDirtyUi();
+  renderWeekReports();
 }
 
 export function renderRecentGoals() {
@@ -406,10 +475,6 @@ export function applyRecentGoal(goal) {
 }
 
 export function renderSetup() {
-  const completed = completedRecords();
-  dom.setupCompletedCount.textContent = String(completed.length);
-  dom.setupAllCount.textContent = String(state.history.length);
-  dom.setupTotalFocus.textContent = formatDuration(completed.reduce((s,r)=>s+r.focusSeconds,0));
   const active = safeRead(ACTIVE_SESSION_KEY, null);
   const onTimer = state.activeScreen === "timer-screen";
   const showBanner = Boolean(active) && !onTimer;
@@ -424,5 +489,6 @@ export function renderSetup() {
   renderRecentGoals();
   renderFocusGoals();
   syncHardcoreHint();
-  drawHeatmap(completed);
+  drawHeatmap(completedRecords());
+  renderSetupTodosWidget();
 }

@@ -1,11 +1,11 @@
-import { ACTIVE_SESSION_KEY, CHANNEL_NAME, HISTORY_KEY, NOTES_INBOX_KEY } from "./constants.js?v=78";
-import { state, tabId } from "./runtime.js?v=78";
-import { safeRead } from "./storage.js?v=78";
-import { showToast } from "./toast.js?v=78";
-import { navigate } from "./theme-nav.js?v=78";
-import { loadData } from "./setup.js?v=78";
-import { stopTimerLoop } from "./session.js?v=78";
-import { renderAll } from "./bind.js?v=78";
+import { ACTIVE_SESSION_KEY, CHANNEL_NAME, HISTORY_KEY, NOTES_INBOX_KEY, TODOS_KEY } from "./constants.js?v=140";
+import { state, tabId } from "./runtime.js?v=140";
+import { safeRead } from "./storage.js?v=140";
+import { showToast } from "./toast.js?v=140";
+import { navigate } from "./theme-nav.js?v=140";
+import { loadData } from "./setup.js?v=140";
+import { stopTimerLoop } from "./session.js?v=140";
+import { renderAll } from "./bind.js?v=140";
 
 export function broadcast(message) {
   try { state.channel?.postMessage(message); } catch (_) {}
@@ -27,7 +27,7 @@ export function initSync() {
           navigate("setup-screen");
         }
       }
-      if (event.data.type === "history" || event.data.type === "inbox") { loadData(); renderAll(); }
+      if (event.data.type === "history" || event.data.type === "inbox" || event.data.type === "todos") { loadData(); renderAll(); }
     });
   } catch (_) {}
   window.addEventListener("storage", (event) => {
@@ -42,6 +42,6 @@ export function initSync() {
         state.session = null; stopTimerLoop(); navigate("setup-screen");
       }
     }
-    if (event.key === HISTORY_KEY || event.key === NOTES_INBOX_KEY) { loadData(); renderAll(); }
+    if (event.key === HISTORY_KEY || event.key === NOTES_INBOX_KEY || event.key === TODOS_KEY) { loadData(); renderAll(); }
   });
 }

@@ -1,7 +1,7 @@
-import { dom, state } from "./runtime.js?v=78";
-import { showToast } from "./toast.js?v=78";
-import { completedRecords, download, formatDuration, localDayKey, scoreFor } from "./utils.js?v=78";
-import { focusProgress, renderFocusGoals } from "./setup.js?v=78";
+import { dom, state } from "./runtime.js?v=140";
+import { showToast } from "./toast.js?v=140";
+import { completedRecords, download, formatDuration, localDayKey, scoreFor, startOfWeek } from "./utils.js?v=140";
+import { focusProgress, renderFocusGoals } from "./setup.js?v=140";
 
 export function downloadWeekCard() {
   const completed = completedRecords();
@@ -130,11 +130,9 @@ export function paintHeatmap(grid, textList, records, monthsEl) {
   const weeks = 12;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const mondayOffset = (today.getDay() + 6) % 7; // Monday-first, matches app calendars
-  const thisMonday = new Date(today);
-  thisMonday.setDate(today.getDate() - mondayOffset);
-  const start = new Date(thisMonday);
-  start.setDate(thisMonday.getDate() - (weeks - 1) * 7);
+  const thisWeekStart = startOfWeek(today);
+  const start = new Date(thisWeekStart);
+  start.setDate(thisWeekStart.getDate() - (weeks - 1) * 7);
 
   const byDay = {};
   records.forEach((r) => {
@@ -171,11 +169,27 @@ export function paintHeatmap(grid, textList, records, monthsEl) {
     const label = future
       ? `${d.toLocaleDateString()}: upcoming`
       : `${d.toLocaleDateString()}: ${formatDuration(v)} completed focus`;
-    const cell = document.createElement("span");
+    const cell = document.createElement(future ? "span" : "button");
     cell.className = "heat-cell";
-    if (future) cell.classList.add("is-future");
-    cell.dataset.level = (!future && v) ? String(Math.min(4, Math.ceil((v / max) * 4))) : "0";
-    cell.title = label;
+    const level = (!future && v) ? String(Math.min(4, Math.ceil((v / max) * 4))) : "0";
+    if (future) {
+      cell.classList.add("is-future");
+    } else {
+      cell.type = "button";
+      cell.dataset.day = k;
+      cell.setAttribute(
+        "aria-label",
+        v
+          ? `${label}. Open this day in History.`
+          : `${d.toLocaleDateString()}: no activity.`
+      );
+    }
+    cell.dataset.level = level;
+    cell.title = future
+      ? label
+      : v
+        ? `${label} · Open in History`
+        : `${d.toLocaleDateString()}: no activity`;
     grid.append(cell);
     if (textList && !future && v) {
       const li = document.createElement("li");
