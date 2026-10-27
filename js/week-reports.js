@@ -1,8 +1,8 @@
 /** Weekly goal rollover reports — history stays intact; progress window resets. */
-import { FOCUS_GOALS_KEY, MAX_WEEK_REPORTS, WEEK_REPORTS_KEY } from "./constants.js?v=202";
-import { dom, state } from "./runtime.js?v=202";
-import { safeRead, safeWrite } from "./storage.js?v=202";
-import { showToast } from "./toast.js?v=202";
+import { FOCUS_GOALS_KEY, MAX_WEEK_REPORTS, WEEK_REPORTS_KEY } from "./constants.js?v=207";
+import { dom, state } from "./runtime.js?v=207";
+import { safeRead, safeWrite } from "./storage.js?v=207";
+import { showToast } from "./toast.js?v=207";
 import {
   download,
   endOfWeek,
@@ -12,8 +12,8 @@ import {
   scoreFor,
   startOfWeek,
   WEEKDAY_OPTIONS
-} from "./utils.js?v=202";
-import { completionDurationLabel } from "./todos.js?v=202";
+} from "./utils.js?v=207";
+import { completionDurationLabel } from "./todos.js?v=207";
 
 function escapeHtml(value) {
   return String(value ?? "")

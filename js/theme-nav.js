@@ -1,11 +1,11 @@
-import { THEME_KEY } from "./constants.js?v=202";
-import { dom, state } from "./runtime.js?v=202";
-import { safeWrite } from "./storage.js?v=202";
-import { renderSetup } from "./setup.js?v=202";
-import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=202";
-import { closeDatePicker, renderHistory } from "./history.js?v=202";
-import { renderInsights } from "./insights.js?v=202";
-import { renderNotes } from "./notes.js?v=202";
+import { THEME_KEY } from "./constants.js?v=207";
+import { dom, state } from "./runtime.js?v=207";
+import { safeWrite } from "./storage.js?v=207";
+import { renderSetup } from "./setup.js?v=207";
+import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=207";
+import { closeDatePicker, renderHistory } from "./history.js?v=207";
+import { renderInsights } from "./insights.js?v=207";
+import { renderNotes } from "./notes.js?v=207";
 import {
   applyUserTheme,
   deleteUserTheme,
@@ -18,9 +18,9 @@ import {
   saveCurrentLookAsTheme,
   setCustomizeNeedsSave,
   switchToPresetTheme
-} from "./customize.js?v=202";
-import { renderTodos } from "./todos.js?v=202";
-import { renderSettings } from "./settings.js?v=202";
+} from "./customize.js?v=207";
+import { renderTodos } from "./todos.js?v=207";
+import { renderSettings } from "./settings.js?v=207";
 
 export const screenMap = {
   timer: "timer-screen", history: "history-screen", insights: "insights-screen", notes: "notes-screen",

@@ -1,18 +1,18 @@
-import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=202";
-import { dom, state, tabId } from "./runtime.js?v=202";
-import { safeRead, safeWrite } from "./storage.js?v=202";
-import { showToast } from "./toast.js?v=202";
-import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=202";
-import { broadcast } from "./sync.js?v=202";
-import { navigate } from "./theme-nav.js?v=202";
+import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=207";
+import { dom, state, tabId } from "./runtime.js?v=207";
+import { safeRead, safeWrite } from "./storage.js?v=207";
+import { showToast } from "./toast.js?v=207";
+import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=207";
+import { broadcast } from "./sync.js?v=207";
+import { navigate } from "./theme-nav.js?v=207";
 import {
   breakIntervalFitsFocus, currentTagValue, pomodoroIntervalSeconds, readPomodoroMinutesFromDom,
   rememberRecentGoal, renderRecentGoals, resetSetupFormDefaults,
   syncBreakFocusValidation, syncPomodoroIntervalVisibility, syncPomodoroMinuteOptions
-} from "./setup.js?v=202";
-import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=202";
-import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, formatNotePlainText, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=202";
-import { pauseTaskTimer, startTaskTimer } from "./todos.js?v=202";
+} from "./setup.js?v=207";
+import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=207";
+import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, formatNotePlainText, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=207";
+import { pauseTaskTimer, startTaskTimer } from "./todos.js?v=207";
 
 export function normalizeRecord(record) {
   if (!record || typeof record !== "object") return null;
@@ -379,7 +379,7 @@ export function startSession(event) {
           ? `Custom break time (${breakMin}m) must be under focus time (${focusMin}m).`
           : `Break reminder (${breakMin}m) must be under focus time (${focusMin}m).`
       );
-      import("./settings.js?v=202").then(({ openSettingsForBreaks }) => openSettingsForBreaks());
+      import("./settings.js?v=207").then(({ openSettingsForBreaks }) => openSettingsForBreaks());
       return;
     }
     state.prefs.pomodoro = true;

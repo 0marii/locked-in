@@ -1,12 +1,12 @@
-import { MAX_NOTE_GROUPS, NOTE_GROUPS_KEY, NOTES_INBOX_KEY } from "./constants.js?v=202";
-import { dom, state, tabId } from "./runtime.js?v=202";
-import { safeRead, safeWrite } from "./storage.js?v=202";
-import { showToast } from "./toast.js?v=202";
-import { download, formatDate, formatShortDate, localDayKey, noteFilename, setFilterGlow } from "./utils.js?v=202";
-import { broadcast } from "./sync.js?v=202";
-import { askConfirm } from "./theme-nav.js?v=202";
-import { deleteStickyNote, persistSessionNotes, renderStickyNoteList, syncStickyNotesUi } from "./session.js?v=202";
-import { renderHistory, renderReportNotesList, renderSessionNotesViewer, saveHistory, updateEditNotesSummary } from "./history.js?v=202";
+import { MAX_NOTE_GROUPS, NOTE_GROUPS_KEY, NOTES_INBOX_KEY } from "./constants.js?v=207";
+import { dom, state, tabId } from "./runtime.js?v=207";
+import { safeRead, safeWrite } from "./storage.js?v=207";
+import { showToast } from "./toast.js?v=207";
+import { download, formatDate, formatShortDate, localDayKey, noteFilename, setFilterGlow } from "./utils.js?v=207";
+import { broadcast } from "./sync.js?v=207";
+import { askConfirm } from "./theme-nav.js?v=207";
+import { deleteStickyNote, persistSessionNotes, renderStickyNoteList, syncStickyNotesUi } from "./session.js?v=207";
+import { renderHistory, renderReportNotesList, renderSessionNotesViewer, saveHistory, updateEditNotesSummary } from "./history.js?v=207";
 
 const NEW_GROUP_OPTION = "__new__";
 const COLLAPSED_NOTE_GROUPS_KEY = "locked_in_notes_collapsed_v1";
@@ -39,15 +39,40 @@ function createGroupTitle(name) {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "notes-group-toggle";
-  const caret = document.createElement("span");
-  caret.className = "notes-group-caret";
+  const caret = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  caret.setAttribute("class", "notes-group-caret");
+  caret.setAttribute("viewBox", "0 0 12 12");
   caret.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M4.2 2.4 7.8 6 4.2 9.6");
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "1.6");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  caret.append(path);
   const label = document.createElement("span");
   label.className = "notes-group-name";
   label.textContent = name;
   toggle.append(caret, label);
   title.append(toggle);
   return title;
+}
+
+function bindNoteOpen(content, open) {
+  content.classList.add("note-open");
+  content.tabIndex = 0;
+  content.setAttribute("role", "button");
+  const title = content.querySelector(".note-card-title")?.textContent
+    || content.querySelector(".note-card-body")?.textContent
+    || "note";
+  content.setAttribute("aria-label", `Open ${title}`);
+  content.addEventListener("click", open);
+  content.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    open();
+  });
 }
 
 function applyGroupCollapse(card, { key, name, body, forceOpen = false } = {}) {
@@ -761,6 +786,14 @@ function buildInboxNoteItem(n, index, groupLabel) {
   const content = document.createElement("div");
   content.className = "note-card-content";
   fillNoteContent(content, n);
+  const open = () => openNoteEditor({
+    scope: "inbox",
+    noteId: n.id,
+    title: n.title || "",
+    text: n.text || "",
+    groupId: n.groupId || ""
+  });
+  bindNoteOpen(content, open);
   const foot = document.createElement("div");
   foot.className = "session-note-item-foot";
   const time = document.createElement("small");
@@ -771,13 +804,7 @@ function buildInboxNoteItem(n, index, groupLabel) {
   actions.append(createNoteItemOptions({
     text: plain,
     label: n.title || `${groupLabel || "inbox"}-${index + 1}`,
-    onEdit: () => openNoteEditor({
-      scope: "inbox",
-      noteId: n.id,
-      title: n.title || "",
-      text: n.text || "",
-      groupId: n.groupId || ""
-    }),
+    onEdit: open,
     onDelete: () => {
       state.editingNote = {
         scope: "inbox",
@@ -808,14 +835,10 @@ function renderInboxGroupCard({ id, name, items, query }) {
 
   const groupActions = document.createElement("div");
   groupActions.className = "note-card-actions session-notes-group-actions";
-  const menuItems = [];
-  if (id) {
-    menuItems.push(
-      { label: "Rename group", onClick: () => renameNoteGroup(id) },
-      { label: "Delete group", danger: true, onClick: () => deleteNoteGroup(id) }
-    );
-  }
-  menuItems.push({ label: "Add note here", onClick: () => openNoteComposer({ groupId: id || "" }) });
+  const menuItems = [
+    { label: "Add note here", onClick: () => openNoteComposer({ groupId: id || "" }) }
+  ];
+  if (id) menuItems.push({ label: "Rename group", onClick: () => renameNoteGroup(id) });
   if (items.length) {
     const allText = items.map((item, i) => `Note ${i + 1}\n${formatNotePlainText(item)}`).join("\n\n");
     menuItems.push(
@@ -823,6 +846,7 @@ function renderInboxGroupCard({ id, name, items, query }) {
       { label: "Download all in this group", onClick: () => downloadNoteText(allText, name || "inbox-group") }
     );
   }
+  if (id) menuItems.push({ label: "Delete group", danger: true, onClick: () => deleteNoteGroup(id) });
   groupActions.append(createNoteOptionsMenu(menuItems, "Group options"));
   head.append(groupActions);
   card.append(head);
@@ -830,18 +854,18 @@ function renderInboxGroupCard({ id, name, items, query }) {
   const body = document.createElement("div");
   body.className = "notes-group-body";
   body.id = `notes-group-${noteGroupKey("inbox", id || "ungrouped").replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  if (!items.length) {
+  if (!items.length && query) {
     const empty = document.createElement("p");
     empty.className = "empty-inline";
-    empty.textContent = query
-      ? "No matching notes in this group."
-      : "No notes in this group yet.";
+    empty.textContent = "No matching notes in this group.";
     body.append(empty);
-  } else {
+  } else if (items.length) {
     const list = document.createElement("ul");
     list.className = "session-note-items";
     items.forEach((item, index) => list.append(buildInboxNoteItem(item, index, name)));
     body.append(list);
+  } else {
+    body.hidden = true;
   }
   card.append(body);
   applyGroupCollapse(card, {
@@ -966,7 +990,7 @@ function setNotesDateValue(field, iso) {
 export async function openNotesDatePicker(field) {
   const anchor = field === "from" ? dom.notesDateFromBtn : dom.notesDateToBtn;
   if (!anchor) return;
-  const { toggleCustomDatePicker } = await import("./history.js?v=202");
+  const { toggleCustomDatePicker } = await import("./history.js?v=207");
   toggleCustomDatePicker({
     id: `notes-${field}`,
     getValue: () => String((field === "from" ? dom.notesDateFrom : dom.notesDateTo)?.value || ""),
@@ -1241,8 +1265,7 @@ export function renderNotes() {
       const groupActions = document.createElement("div");
       groupActions.className = "note-card-actions session-notes-group-actions";
       const sessionMenu = [
-        { label: "Rename group", onClick: () => openSessionGroupRename(group.sessionId, group.live) },
-        { label: "Delete group", danger: true, onClick: () => deleteSessionNotesGroup(group.sessionId, group.live) }
+        { label: "Rename group", onClick: () => openSessionGroupRename(group.sessionId, group.live) }
       ];
       if (group.items.length) {
         const allText = group.items.map((item, i) => {
@@ -1254,6 +1277,7 @@ export function renderNotes() {
           { label: "Download all in this group", onClick: () => downloadNoteText(allText, group.intent || "session-notes") }
         );
       }
+      sessionMenu.push({ label: "Delete group", danger: true, onClick: () => deleteSessionNotesGroup(group.sessionId, group.live) });
       groupActions.append(createNoteOptionsMenu(sessionMenu, "Group options"));
       head.append(groupActions);
       card.append(head);
@@ -1262,10 +1286,7 @@ export function renderNotes() {
       body.className = "notes-group-body";
       body.id = `notes-group-${noteGroupKey("session", group.sessionId).replace(/[^a-zA-Z0-9_-]/g, "")}`;
       if (!group.items.length) {
-        const empty = document.createElement("p");
-        empty.className = "empty-inline";
-        empty.textContent = "No notes in this session yet.";
-        body.append(empty);
+        body.hidden = true;
       } else {
         const list = document.createElement("ul");
         list.className = "session-note-items";
@@ -1275,6 +1296,16 @@ export function renderNotes() {
           const content = document.createElement("div");
           content.className = "note-card-content";
           fillNoteContent(content, item);
+          const open = () => openNoteEditor({
+            scope: group.live ? "live" : "history",
+            sessionId: group.sessionId,
+            noteId: item.id,
+            intent: group.intent,
+            live: group.live,
+            title: item.title || "",
+            text: item.text || ""
+          });
+          bindNoteOpen(content, open);
           const foot = document.createElement("div");
           foot.className = "session-note-item-foot";
           const time = document.createElement("small");
@@ -1285,15 +1316,7 @@ export function renderNotes() {
           actions.append(createNoteItemOptions({
             text: plain,
             label: item.title || `${group.intent || "note"}-${index + 1}`,
-            onEdit: () => openNoteEditor({
-              scope: group.live ? "live" : "history",
-              sessionId: group.sessionId,
-              noteId: item.id,
-              intent: group.intent,
-              live: group.live,
-              title: item.title || "",
-              text: item.text || ""
-            }),
+            onEdit: open,
             onDelete: () => {
               state.editingNote = {
                 scope: group.live ? "live" : "history",
@@ -1402,12 +1425,62 @@ export function downloadNoteText(text, label = "note") {
 }
 
 export function closeOpenNoteMenus(except = null) {
-  document.querySelectorAll(".note-options.is-open").forEach((menu) => {
-    if (except && menu === except) return;
-    menu.classList.remove("is-open");
-    const toggle = menu.querySelector(".note-options-toggle");
+  document.querySelectorAll(".note-options.is-open").forEach((wrap) => {
+    if (except && wrap === except) return;
+    wrap.classList.remove("is-open");
+    const toggle = wrap.querySelector(".note-options-toggle");
     if (toggle) toggle.setAttribute("aria-expanded", "false");
   });
+  document.querySelectorAll(".note-options-menu.is-open").forEach((panel) => {
+    const wrap = panel._noteOptionsWrap;
+    if (except && wrap === except) return;
+    panel.classList.remove("is-open");
+    if (wrap && panel.parentElement !== wrap) wrap.append(panel);
+    panel.style.position = "";
+    panel.style.top = "";
+    panel.style.left = "";
+    panel.style.right = "";
+    panel.style.width = "";
+    panel.style.minWidth = "";
+  });
+}
+
+let noteMenuDismissBound = false;
+
+function bindNoteMenuDismiss() {
+  if (noteMenuDismissBound) return;
+  noteMenuDismissBound = true;
+  const close = () => closeOpenNoteMenus();
+  window.addEventListener("resize", close);
+  window.addEventListener("scroll", close, true);
+}
+
+function placeNoteOptionsMenu(menu, toggle) {
+  menu.style.position = "fixed";
+  menu.style.right = "auto";
+  menu.style.left = "0";
+  menu.style.top = "0";
+  menu.style.width = "max-content";
+  menu.style.minWidth = "176px";
+  const margin = 8;
+  const anchor = toggle.getBoundingClientRect();
+  const panel = menu.getBoundingClientRect();
+  const width = Math.max(176, Math.ceil(panel.width));
+  const height = Math.ceil(panel.height);
+  menu.style.width = `${width}px`;
+  const spaceBelow = window.innerHeight - anchor.bottom - margin;
+  const spaceAbove = anchor.top - margin;
+  let top = anchor.bottom + 6;
+  if (height + 6 > spaceBelow && spaceAbove > spaceBelow) {
+    top = Math.max(margin, anchor.top - height - 6);
+  }
+  let left = anchor.right - width;
+  if (left < margin) left = margin;
+  if (left + width > window.innerWidth - margin) {
+    left = Math.max(margin, window.innerWidth - width - margin);
+  }
+  menu.style.top = `${Math.round(top)}px`;
+  menu.style.left = `${Math.round(left)}px`;
 }
 
 export function createNoteOptionsMenu(items, label = "Options") {
@@ -1425,6 +1498,12 @@ export function createNoteOptionsMenu(items, label = "Options") {
   menu.className = "note-options-menu";
   menu.setAttribute("role", "menu");
   (items || []).forEach((item) => {
+    if (item.danger && menu.childElementCount) {
+      const rule = document.createElement("div");
+      rule.className = "note-options-sep";
+      rule.setAttribute("role", "separator");
+      menu.append(rule);
+    }
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `note-options-item${item.danger ? " is-danger" : ""}`;
@@ -1443,8 +1522,13 @@ export function createNoteOptionsMenu(items, label = "Options") {
     closeOpenNoteMenus();
     if (!willOpen) return;
     wrap.classList.add("is-open");
+    menu.classList.add("is-open");
+    menu._noteOptionsWrap = wrap;
+    document.body.append(menu);
     toggle.setAttribute("aria-expanded", "true");
+    placeNoteOptionsMenu(menu, toggle);
   });
+  bindNoteMenuDismiss();
   wrap.append(toggle, menu);
   return wrap;
 }

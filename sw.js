@@ -1,6 +1,6 @@
 /* Locked-In service worker — network-first HTML, cache-first static assets. */
-const CACHE = "locked-in-v129";
-const ASSET_V = "202";
+const CACHE = "locked-in-v134";
+const ASSET_V = "207";
 const PRECACHE = [
   "./",
   "./index.html",

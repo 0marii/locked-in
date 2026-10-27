@@ -39,11 +39,11 @@
     .hero-copy{margin:12px 0 0;color:rgba(242,244,237,.72);font-size:15px;max-width:36rem}
   </style>
   <!-- Full CSS loads async after critical hero styles (mobile LCP). -->
-  <link rel="preload" href="./style.css?v=202" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <link rel="stylesheet" href="./css/screens.css?v=202" media="print" onload="this.media='all'">
+  <link rel="preload" href="./style.css?v=207" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="stylesheet" href="./css/screens.css?v=207" media="print" onload="this.media='all'">
   <noscript>
-    <link rel="stylesheet" href="./style.css?v=202">
-    <link rel="stylesheet" href="./css/screens.css?v=202">
+    <link rel="stylesheet" href="./style.css?v=207">
+    <link rel="stylesheet" href="./css/screens.css?v=207">
   </noscript>
   <script>
     /*! loadCSS rel=preload polyfill-ish */
@@ -813,12 +813,12 @@
       <div class="section-hero notes-hero">
         <p class="eyebrow">YOUR NOTES</p>
         <h1 id="notes-title">Thoughts worth keeping.</h1>
-        <p>Group inbox notes like sessions. Session notes appear after you focus.</p>
+        <p>Search a title, open the note, or keep it in a folder.</p>
       </div>
       <div class="notes-toolbar">
         <button class="button button-primary notes-new-btn" id="notes-new-btn" type="button">New note</button>
         <button class="button button-secondary notes-new-group-btn" id="notes-new-group-btn" type="button">New group</button>
-        <label class="search-field notes-search" for="notes-search"><span aria-hidden="true">⌕</span><input id="notes-search" type="search" placeholder="Search notes…" autocomplete="off"></label>
+        <label class="search-field notes-search" for="notes-search"><span aria-hidden="true">⌕</span><input id="notes-search" type="search" placeholder="Find a note…" autocomplete="off"></label>
         <div class="notes-filters" id="notes-filters">
           <label class="compact-field compact-field-select" for="notes-scope-filter">
             <span>Show</span>
@@ -869,14 +869,14 @@
         <section class="notes-section" id="notes-inbox-panel">
           <header class="notes-section-head">
             <h2>Inbox</h2>
-            <span class="notes-section-hint">Grouped anytime</span>
+            <span class="notes-section-hint">Your folders</span>
           </header>
           <div id="notes-inbox" class="notes-feed"></div>
         </section>
         <section class="notes-section" id="notes-sessions-panel">
           <header class="notes-section-head">
             <h2>Sessions</h2>
-            <span class="notes-section-hint">From focus</span>
+            <span class="notes-section-hint">From sessions</span>
           </header>
           <div id="notes-sessions" class="notes-feed"></div>
         </section>
@@ -1334,7 +1334,7 @@
   </dialog>
   <script type="module">
     // Let first paint / LCP finish before parsing the SPA graph.
-    const boot = () => import("./app.js?v=202");
+    const boot = () => import("./app.js?v=207");
     if ("requestIdleCallback" in window) {
       requestIdleCallback(() => { boot(); }, { timeout: 900 });
     } else {

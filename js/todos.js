@@ -2,13 +2,13 @@
 import {
   MAX_TODO_LISTS, MAX_TODO_STEP_TITLE, MAX_TODO_STEPS, MAX_TODO_TASKS, MAX_TODO_TITLE,
   PREFS_KEY, TODOS_KEY
-} from "./constants.js?v=202";
-import { dom, state, tabId } from "./runtime.js?v=202";
-import { safeRead, safeWrite } from "./storage.js?v=202";
-import { showToast } from "./toast.js?v=202";
-import { formatDuration, formatShortDate, localDayKey } from "./utils.js?v=202";
-import { broadcast } from "./sync.js?v=202";
-import { askConfirm, navigate } from "./theme-nav.js?v=202";
+} from "./constants.js?v=207";
+import { dom, state, tabId } from "./runtime.js?v=207";
+import { safeRead, safeWrite } from "./storage.js?v=207";
+import { showToast } from "./toast.js?v=207";
+import { formatDuration, formatShortDate, localDayKey } from "./utils.js?v=207";
+import { broadcast } from "./sync.js?v=207";
+import { askConfirm, navigate } from "./theme-nav.js?v=207";
 
 export const SMART_MYDAY = "myday";
 export const SMART_IMPORTANT = "important";
@@ -191,7 +191,7 @@ function syncAddFormDraft() {
 async function openTodoDuePicker(anchor, { id, getValue, setValue, onCommit }) {
   if (!anchor) return;
   // Dynamic import avoids a circular dependency with history.js (backup uses todos).
-  const { toggleCustomDatePicker } = await import("./history.js?v=202");
+  const { toggleCustomDatePicker } = await import("./history.js?v=207");
   toggleCustomDatePicker({ id, getValue, setValue, onCommit, anchor });
 }
 
@@ -1692,7 +1692,7 @@ export function bindTodoEvents() {
       if (focusTask) {
         event.preventDefault();
         const id = focusTask.dataset.setupTodoFocus;
-        import("./setup.js?v=202").then(({ linkTodoToSetup }) => {
+        import("./setup.js?v=207").then(({ linkTodoToSetup }) => {
           if (linkTodoToSetup(id)) {
             showToast("To-do linked to your focus goal.");
             dom.taskIntent?.focus();

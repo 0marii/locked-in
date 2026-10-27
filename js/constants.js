@@ -1,6 +1,6 @@
 /** Locked-In constants — storage keys and limits. */
 /** Keep in sync with sw.js ASSET_V (npm run assets:bump / assets:verify). */
-export const APP_ASSET_V = "202";
+export const APP_ASSET_V = "207";
 export const HISTORY_KEY = "locked_in_history_v2";
 export const LEGACY_HISTORY_KEYS = ["focusforge_history_v1", "locked-in-history"];
 export const ACTIVE_SESSION_KEY = "locked_in_active_session_v2";

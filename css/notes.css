@@ -15,28 +15,41 @@
   font-weight: 700;
 }
 
+.notes-search {
+  flex: 1 1 16rem;
+  width: auto;
+  min-width: 12rem;
+}
+
 .notes-section-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
 }
 
 .notes-section-head h2 {
   margin: 0;
-  color: var(--accent);
-  font: 750 12px var(--mono);
-  letter-spacing: 0.06em;
+  color: var(--text-subtle);
+  font: 650 11px var(--font);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .notes-section-hint {
-  color: color-mix(in srgb, var(--text-muted) 70%, var(--text));
-  font-size: 11px;
-  font-weight: 650;
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notes-section-hint::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--text-subtle);
+  font-weight: 500;
 }
 
 .notes-feed {
@@ -133,34 +146,51 @@
   outline-offset: 2px;
 }
 
+.note-options.is-open .note-options-toggle {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--text);
+}
+
 .note-options-menu {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
-  z-index: 40;
+  z-index: 80;
   display: none;
-  min-width: 200px;
-  padding: 6px;
+  min-width: 176px;
+  padding: 4px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-raised);
   box-shadow: var(--shadow);
 }
 
-.note-options.is-open .note-options-menu {
+.note-options.is-open .note-options-menu,
+.note-options-menu.is-open {
   display: grid;
-  gap: 2px;
+  gap: 1px;
+}
+
+.note-options-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
 }
 
 .note-options-item {
   appearance: none;
+  display: flex;
+  align-items: center;
   width: 100%;
-  padding: 9px 12px;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
+  box-shadow: none;
   color: var(--text);
-  font: 650 13px var(--font);
+  font: 600 13px/1.2 var(--font);
   text-align: left;
   cursor: pointer;
 }
@@ -179,7 +209,7 @@
 
 .note-options-item:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .session-notes-group.is-filter-target {
@@ -193,85 +223,61 @@
 }
 
 .session-notes-group {
-  --group-rail-gap: 14px;
   position: relative;
   display: grid;
   gap: 0;
-  margin: 0 0 22px;
-  padding: 0 0 0 2px;
+  margin: 0;
+  padding: 2px 0 4px;
   border: 0;
+  border-bottom: 1px solid var(--border);
   background: transparent;
 }
 
-/* Vertical rail from mid-height of the topic title down through nested notes */
-.session-notes-group::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.65em;
-  bottom: 2px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--accent);
+.session-notes-group::before,
+.session-notes-group-head h3::before,
+.session-note-item::before {
+  content: none;
+  display: none;
 }
 
 .session-notes-group:last-child {
+  border-bottom: 0;
   margin-bottom: 0;
 }
 
 .session-notes-group.is-live {
-  border-radius: 12px;
-  padding: 10px 12px 8px 14px;
+  border-radius: 10px;
+  padding: 4px 8px;
   background: color-mix(in srgb, var(--accent) 7%, transparent);
-}
-
-.session-notes-group.is-live::before {
-  left: 12px;
-  top: calc(10px + 0.65em);
-  bottom: 8px;
 }
 
 .session-notes-group-head {
   position: relative;
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 8px;
   margin: 0;
-  padding: 0 40px 0 0;
+  padding: 4px 0;
   cursor: pointer;
 }
 
-/* Topic title sits on the rail; nested content is indented beside it */
 .session-notes-group-head h3 {
   position: relative;
+  grid-column: 1;
   margin: 0;
-  padding-left: var(--group-rail-gap);
+  padding: 0;
   color: var(--text);
-  font-size: 15px;
-  font-weight: 750;
-  letter-spacing: -0.02em;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-/* L-branch from the rail into the topic title */
-.session-notes-group-head h3::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.65em;
-  width: 10px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--accent);
-}
-
-.session-notes-group-head h3:has(.notes-group-toggle)::before {
-  display: none;
-}
-
 .notes-group-toggle {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   width: 100%;
   margin: 0;
@@ -296,75 +302,68 @@
 }
 
 .notes-group-caret {
-  width: 7px;
-  height: 7px;
-  margin-top: 0.38em;
+  width: 12px;
+  height: 12px;
   flex: 0 0 auto;
-  border-right: 1.8px solid var(--accent);
-  border-bottom: 1.8px solid var(--accent);
-  transform: rotate(45deg);
+  color: var(--text-subtle);
+  transform: rotate(90deg);
 }
 
 .session-notes-group.is-collapsed .notes-group-caret {
-  margin-top: 0.28em;
-  border-color: var(--text-muted);
-  transform: rotate(-45deg);
+  color: var(--text-subtle);
+  transform: rotate(0deg);
 }
 
 .session-notes-group-head:hover .notes-group-caret {
-  border-color: var(--accent);
+  color: var(--text);
 }
 
 .session-notes-group.is-collapsed {
-  margin-bottom: 12px;
-}
-
-.session-notes-group.is-collapsed::before {
-  bottom: auto;
-  height: 0.85em;
+  padding-bottom: 2px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .notes-group-caret {
-    transition: transform 0.15s ease, border-color 0.15s ease;
+    transition: transform 0.15s ease, color 0.15s ease;
   }
 }
 
 .session-notes-group-head > small,
 .session-notes-group-topic {
-  padding-left: var(--group-rail-gap);
+  grid-column: 1 / -1;
+  padding-left: 20px;
 }
 
 .session-notes-group-head small {
-  color: color-mix(in srgb, var(--text-muted) 70%, var(--text));
-  font-size: 11px;
-  font-weight: 600;
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .session-notes-group.is-live .session-notes-group-head small {
   color: var(--accent);
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .session-notes-group-topic {
   margin-top: 0;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .session-notes-group-actions {
-  position: absolute;
-  top: -2px;
-  right: 0;
+  grid-column: 2;
+  grid-row: 1;
+  position: static;
   margin: 0;
   cursor: default;
 }
 
 .session-note-items {
   list-style: none;
-  margin: 6px 0 0;
-  padding: 0 0 0 var(--group-rail-gap);
+  margin: 0;
+  padding: 0 0 4px 20px;
   display: grid;
   gap: 0;
 }
@@ -372,33 +371,26 @@
 .session-note-item {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 10px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0 8px;
+  align-items: center;
   margin: 0;
-  padding: 8px 0 8px 10px;
+  padding: 7px 0;
   border: 0;
+  border-radius: 8px;
   background: transparent;
 }
 
 .session-note-item + .session-note-item {
-  border-top: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
 }
 
-/* Branch from the vertical rail into each note */
 .session-note-item::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 1.05em;
-  width: 8px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--accent);
+  content: none;
 }
 
-.session-notes-group.is-live .session-note-item {
-  border-top-color: color-mix(in srgb, var(--accent) 18%, var(--border));
+.session-note-item:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
 .session-note-item > .note-card-content,
@@ -409,45 +401,65 @@
   min-width: 0;
 }
 
+.note-open {
+  display: grid;
+  gap: 1px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.note-open:hover .note-card-title {
+  color: var(--accent);
+}
+
+.note-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .session-note-item > p,
 .session-note-item .note-card-body {
   margin: 0;
-  color: var(--text);
+  overflow: hidden;
+  color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .session-note-item .note-card-title {
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 650;
 }
 
 .session-note-item-foot {
-  grid-column: 1;
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
 .session-note-item-foot small {
   color: var(--text-subtle);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .session-note-item .note-card-actions {
-  grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-column: 3;
+  grid-row: 1;
   margin: 0;
 }
 
-#notes-screen .empty-inline,
-.empty-inline {
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 650;
-  padding: 8px 0;
+#notes-screen .notes-group-body > .empty-inline {
+  margin: 2px 0 6px;
+  padding: 0 0 0 20px;
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 @media (max-width: 640px) {

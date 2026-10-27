@@ -2,18 +2,18 @@ import {
   ACTIVE_SESSION_KEY, DEFAULT_POMODORO_MINUTES, FOCUS_GOALS_KEY, GOAL_LIMITS, HISTORY_KEY, LEGACY_HISTORY_KEYS,
   MAX_HISTORY, MAX_NOTE_GROUPS, NOTE_GROUPS_KEY, NOTES_INBOX_KEY, POMODORO_CUSTOM_MAX, POMODORO_CUSTOM_MIN,
   POMODORO_MINUTE_OPTIONS, PREFS_KEY, RECENT_GOALS_KEY
-} from "./constants.js?v=202";
-import { dom, state } from "./runtime.js?v=202";
-import { safeRead, safeWrite } from "./storage.js?v=202";
-import { showToast } from "./toast.js?v=202";
+} from "./constants.js?v=207";
+import { dom, state } from "./runtime.js?v=207";
+import { safeRead, safeWrite } from "./storage.js?v=207";
+import { showToast } from "./toast.js?v=207";
 import {
   clampGoalMinutes, countedFocusRecords, formatClock, formatDuration, formatGoalClock, formatShortDate,
   localDayKey, normalizePomodoroMinutes, normalizeWeekStartsOn, startOfWeek, WEEKDAY_OPTIONS
-} from "./utils.js?v=202";
-import { normalizeRecord } from "./session.js?v=202";
-import { drawHeatmap } from "./insights.js?v=202";
-import { findList, listOpenTasksForSetup, loadTodos, renderSetupTodosWidget } from "./todos.js?v=202";
-import { currentProgressWindow, ensureWeekRollover, loadWeekReports, renderWeekReports } from "./week-reports.js?v=202";
+} from "./utils.js?v=207";
+import { normalizeRecord } from "./session.js?v=207";
+import { drawHeatmap } from "./insights.js?v=207";
+import { findList, listOpenTasksForSetup, loadTodos, renderSetupTodosWidget } from "./todos.js?v=207";
+import { currentProgressWindow, ensureWeekRollover, loadWeekReports, renderWeekReports } from "./week-reports.js?v=207";
 
 export const CHIME_HINTS = {
   off: "No sound for session end, break reminders, or break suggestions.",

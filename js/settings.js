@@ -13,12 +13,12 @@ import {
   TODOS_KEY,
   USER_THEMES_KEY,
   WEEK_REPORTS_KEY
-} from "./constants.js?v=202";
-import { dom } from "./runtime.js?v=202";
-import { showToast } from "./toast.js?v=202";
-import { askConfirm, navigate } from "./theme-nav.js?v=202";
-import { setPrefsPanelOpen } from "./setup.js?v=202";
-import { requestNotificationPermission } from "./session.js?v=202";
+} from "./constants.js?v=207";
+import { dom } from "./runtime.js?v=207";
+import { showToast } from "./toast.js?v=207";
+import { askConfirm, navigate } from "./theme-nav.js?v=207";
+import { setPrefsPanelOpen } from "./setup.js?v=207";
+import { requestNotificationPermission } from "./session.js?v=207";
 
 export const DEFAULT_PREFS = {
   notifyEnd: false,
@@ -96,7 +96,7 @@ export function eraseEverything() {
 }
 
 async function historyApi() {
-  return import("./history.js?v=202");
+  return import("./history.js?v=207");
 }
 
 export function bindSettingsEvents() {
@@ -123,7 +123,7 @@ export function bindSettingsEvents() {
     else showToast("Notification permission was not granted.");
   });
   dom.goalWeekStartsOn?.addEventListener("change", () => {
-    import("./setup.js?v=202").then(({ saveFocusGoalsWeekStartsOn }) => saveFocusGoalsWeekStartsOn());
+    import("./setup.js?v=207").then(({ saveFocusGoalsWeekStartsOn }) => saveFocusGoalsWeekStartsOn());
   });
 }
 

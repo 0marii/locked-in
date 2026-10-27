@@ -1,19 +1,19 @@
 import {
   CUSTOMIZE_KEY, FOCUS_GOALS_KEY, HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES, MAX_NOTE_GROUPS, MAX_WEEK_REPORTS,
   PREFS_KEY, RECENT_GOALS_KEY, THEME_KEY, WEEK_REPORTS_KEY
-} from "./constants.js?v=202";
-import { dom, state, tabId } from "./runtime.js?v=202";
-import { safeRead, safeWrite } from "./storage.js?v=202";
-import { showToast } from "./toast.js?v=202";
-import { completedRecords, countedFocusRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, setFilterGlow, toISODateLocal } from "./utils.js?v=202";
-import { broadcast } from "./sync.js?v=202";
-import { askConfirm, navigate, setTheme } from "./theme-nav.js?v=202";
-import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=202";
-import { renderInsights } from "./insights.js?v=202";
-import { applyNoteItems, createNoteItemOptions, createNoteOptionsMenu, deleteEditedNote, formatNotePlainText, normalizeNoteFields, normalizeNoteGroup, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, saveNoteGroups, sessionNoteItems } from "./notes.js?v=202";
-import { normalizeTodosDoc, saveTodos } from "./todos.js?v=202";
-import { applyPrefsToDom, loadFocusGoals, loadPrefs, loadRecentGoals, savePrefs } from "./setup.js?v=202";
-import { loadWeekReports, saveWeekReports } from "./week-reports.js?v=202";
+} from "./constants.js?v=207";
+import { dom, state, tabId } from "./runtime.js?v=207";
+import { safeRead, safeWrite } from "./storage.js?v=207";
+import { showToast } from "./toast.js?v=207";
+import { completedRecords, countedFocusRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, setFilterGlow, toISODateLocal } from "./utils.js?v=207";
+import { broadcast } from "./sync.js?v=207";
+import { askConfirm, navigate, setTheme } from "./theme-nav.js?v=207";
+import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=207";
+import { renderInsights } from "./insights.js?v=207";
+import { applyNoteItems, createNoteItemOptions, createNoteOptionsMenu, deleteEditedNote, formatNotePlainText, normalizeNoteFields, normalizeNoteGroup, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, saveNoteGroups, sessionNoteItems } from "./notes.js?v=207";
+import { normalizeTodosDoc, saveTodos } from "./todos.js?v=207";
+import { applyPrefsToDom, loadFocusGoals, loadPrefs, loadRecentGoals, savePrefs } from "./setup.js?v=207";
+import { loadWeekReports, saveWeekReports } from "./week-reports.js?v=207";
 import {
   applyCustomizePack,
   applyUserTheme,
@@ -22,8 +22,8 @@ import {
   parseUserThemeKey,
   saveCustomizePack,
   saveUserThemes
-} from "./customize.js?v=202";
-import { renderAll } from "./bind.js?v=202";
+} from "./customize.js?v=207";
+import { renderAll } from "./bind.js?v=207";
 
 export function liveSessionAsHistoryRow(now = Date.now()) {
   const s = state.session;
