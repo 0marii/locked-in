@@ -1,19 +1,19 @@
 import {
   CUSTOMIZE_KEY, FOCUS_GOALS_KEY, HISTORY_KEY, MAX_HISTORY, MAX_IMPORT_BYTES, MAX_NOTE_GROUPS, MAX_WEEK_REPORTS,
   PREFS_KEY, RECENT_GOALS_KEY, THEME_KEY, WEEK_REPORTS_KEY
-} from "./constants.js?v=187";
-import { dom, state, tabId } from "./runtime.js?v=187";
-import { safeRead, safeWrite } from "./storage.js?v=187";
-import { showToast } from "./toast.js?v=187";
-import { completedRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, setFilterGlow, toISODateLocal } from "./utils.js?v=187";
-import { broadcast } from "./sync.js?v=187";
-import { askConfirm, navigate, setTheme } from "./theme-nav.js?v=187";
-import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=187";
-import { renderInsights } from "./insights.js?v=187";
-import { applyNoteItems, createNoteItemOptions, createNoteOptionsMenu, deleteEditedNote, formatNotePlainText, normalizeNoteFields, normalizeNoteGroup, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, saveNoteGroups, sessionNoteItems } from "./notes.js?v=187";
-import { normalizeTodosDoc, saveTodos } from "./todos.js?v=187";
-import { applyPrefsToDom, loadFocusGoals, loadPrefs, loadRecentGoals, savePrefs } from "./setup.js?v=187";
-import { loadWeekReports, saveWeekReports } from "./week-reports.js?v=187";
+} from "./constants.js?v=202";
+import { dom, state, tabId } from "./runtime.js?v=202";
+import { safeRead, safeWrite } from "./storage.js?v=202";
+import { showToast } from "./toast.js?v=202";
+import { completedRecords, countedFocusRecords, csvEscape, download, explainOutcome, explainScore, formatDate, formatDuration, formatShortDate, scoreBreakdown, scoreFor, setFilterGlow, toISODateLocal } from "./utils.js?v=202";
+import { broadcast } from "./sync.js?v=202";
+import { askConfirm, navigate, setTheme } from "./theme-nav.js?v=202";
+import { activeFocusSeconds, currentBreakSeconds, elapsedSeconds, normalizeRecord } from "./session.js?v=202";
+import { renderInsights } from "./insights.js?v=202";
+import { applyNoteItems, createNoteItemOptions, createNoteOptionsMenu, deleteEditedNote, formatNotePlainText, normalizeNoteFields, normalizeNoteGroup, openNoteEditor, refreshNotesSurfaces, renderNotes, saveInbox, saveNoteGroups, sessionNoteItems } from "./notes.js?v=202";
+import { normalizeTodosDoc, saveTodos } from "./todos.js?v=202";
+import { applyPrefsToDom, loadFocusGoals, loadPrefs, loadRecentGoals, savePrefs } from "./setup.js?v=202";
+import { loadWeekReports, saveWeekReports } from "./week-reports.js?v=202";
 import {
   applyCustomizePack,
   applyUserTheme,
@@ -22,8 +22,8 @@ import {
   parseUserThemeKey,
   saveCustomizePack,
   saveUserThemes
-} from "./customize.js?v=187";
-import { renderAll } from "./bind.js?v=187";
+} from "./customize.js?v=202";
+import { renderAll } from "./bind.js?v=202";
 
 export function liveSessionAsHistoryRow(now = Date.now()) {
   const s = state.session;
@@ -691,9 +691,10 @@ export function renderHistory() {
     : "Completed and incomplete attempts will appear here.";
   dom.historyStartBtn.classList.toggle("is-hidden", hasHistoryButFilteredOut);
   const completed = completedRecords();
+  const focusRecords = countedFocusRecords();
   dom.historyCompletedCount.textContent = String(completed.length);
   dom.historyAttemptCount.textContent = String(state.history.length);
-  dom.historyTotalFocus.textContent = formatDuration(completed.reduce((s, r) => s + r.focusSeconds, 0));
+  dom.historyTotalFocus.textContent = formatDuration(focusRecords.reduce((s, r) => s + r.focusSeconds, 0));
   requestAnimationFrame(syncHistoryTableScroll);
 }
 
@@ -1054,7 +1055,10 @@ function normalizeImportedFocusGoals(raw) {
     dailyMinutes: Number.isFinite(Number(raw.dailyMinutes)) ? Number(raw.dailyMinutes) : base.dailyMinutes,
     weeklyMinutes: Number.isFinite(Number(raw.weeklyMinutes)) ? Number(raw.weeklyMinutes) : base.weeklyMinutes,
     weekStartsOn: Number.isFinite(Number(raw.weekStartsOn)) ? Number(raw.weekStartsOn) : base.weekStartsOn,
-    activeWeekKey: typeof raw.activeWeekKey === "string" ? raw.activeWeekKey : base.activeWeekKey
+    activeWeekKey: typeof raw.activeWeekKey === "string" ? raw.activeWeekKey : base.activeWeekKey,
+    progressResetAt: Number.isFinite(Date.parse(raw.progressResetAt))
+      ? new Date(raw.progressResetAt).toISOString()
+      : (base.progressResetAt || null)
   };
 }
 
@@ -1065,7 +1069,8 @@ function persistFocusGoalsSnapshot(goals) {
     dailyMinutes: goals.dailyMinutes,
     weeklyMinutes: goals.weeklyMinutes,
     weekStartsOn: goals.weekStartsOn,
-    activeWeekKey: goals.activeWeekKey || null
+    activeWeekKey: goals.activeWeekKey || null,
+    progressResetAt: goals.progressResetAt || null
   });
 }
 

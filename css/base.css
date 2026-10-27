@@ -2,7 +2,7 @@
 
 html { scroll-behavior: smooth; scroll-padding-top: 90px; }
 
-body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.55; transition: background .2s ease, color .2s ease; }
+body { margin: 0; min-width: 320px; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.55; transition: background .2s ease, color .2s ease; }
 
 button, input, select, textarea { font: inherit; }
 

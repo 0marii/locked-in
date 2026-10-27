@@ -76,6 +76,7 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; col
 .compact-field.is-filter-active .date-field-trigger,
 .search-field.is-filter-active,
 .todos-filter-field.is-filter-active select,
+.todos-filter-field.is-filter-active .todo-menu-trigger,
 .todos-filter-day-btn.is-filter-active {
   border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
   background-color: color-mix(in srgb, var(--accent) 14%, var(--surface-raised, var(--surface)));

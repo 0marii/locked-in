@@ -1,6 +1,6 @@
 /** Locked-In constants — storage keys and limits. */
 /** Keep in sync with sw.js ASSET_V (npm run assets:bump / assets:verify). */
-export const APP_ASSET_V = "187";
+export const APP_ASSET_V = "202";
 export const HISTORY_KEY = "locked_in_history_v2";
 export const LEGACY_HISTORY_KEYS = ["focusforge_history_v1", "locked-in-history"];
 export const ACTIVE_SESSION_KEY = "locked_in_active_session_v2";
@@ -21,6 +21,10 @@ export const MAX_SVG_BYTES = 50 * 1024;
 export const MAX_TODO_LISTS = 40;
 export const MAX_TODO_TASKS = 500;
 export const MAX_TODO_STEPS = 20;
+/** Task titles support multiline notes-like text (paste-friendly). */
+export const MAX_TODO_TITLE = 4000;
+/** Step titles stay shorter than tasks. */
+export const MAX_TODO_STEP_TITLE = 1000;
 export const MAX_HISTORY = 1000;
 export const BREAK_REMINDER_MS = 5 * 60 * 1000;
 /** Suggest-breaks reminder presets (minutes). Other values use Custom. */

@@ -1,11 +1,11 @@
-import { THEME_KEY } from "./constants.js?v=187";
-import { dom, state } from "./runtime.js?v=187";
-import { safeWrite } from "./storage.js?v=187";
-import { renderSetup } from "./setup.js?v=187";
-import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=187";
-import { closeDatePicker, renderHistory } from "./history.js?v=187";
-import { renderInsights } from "./insights.js?v=187";
-import { renderNotes } from "./notes.js?v=187";
+import { THEME_KEY } from "./constants.js?v=202";
+import { dom, state } from "./runtime.js?v=202";
+import { safeWrite } from "./storage.js?v=202";
+import { renderSetup } from "./setup.js?v=202";
+import { renderTimer, syncFloatingTimer, syncStickyNotesUi } from "./session.js?v=202";
+import { closeDatePicker, renderHistory } from "./history.js?v=202";
+import { renderInsights } from "./insights.js?v=202";
+import { renderNotes } from "./notes.js?v=202";
 import {
   applyUserTheme,
   deleteUserTheme,
@@ -18,9 +18,9 @@ import {
   saveCurrentLookAsTheme,
   setCustomizeNeedsSave,
   switchToPresetTheme
-} from "./customize.js?v=187";
-import { renderTodos } from "./todos.js?v=187";
-import { renderSettings } from "./settings.js?v=187";
+} from "./customize.js?v=202";
+import { renderTodos } from "./todos.js?v=202";
+import { renderSettings } from "./settings.js?v=202";
 
 export const screenMap = {
   timer: "timer-screen", history: "history-screen", insights: "insights-screen", notes: "notes-screen",
@@ -73,7 +73,7 @@ export function proceedNavigate(id, replace = false) {
   syncFloatingTimer();
   if (id !== "timer-screen") safeWrite("locked_in_last_screen", id);
   const title = { "setup-screen": "Locked-In — Focus Timer", "timer-screen": "Focus session · Locked-In", "report-screen": "Session report · Locked-In", "history-screen": "History · Locked-In", "insights-screen": "Insights · Locked-In", "notes-screen": "Notes · Locked-In", "todos-screen": "To-Do · Locked-In", "customize-screen": "Customize · Locked-In", "settings-screen": "Settings · Locked-In" }[id];
-  document.title = title || "Locked-In";
+  if (!state.session) document.title = title || "Locked-In";
   const heading = document.querySelector(`#${id} h1`);
   if (heading) {
     heading.tabIndex = -1;

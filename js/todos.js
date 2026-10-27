@@ -1,11 +1,14 @@
 /** Microsoft To Do–inspired tasks: lists, My Day, due dates, steps. */
-import { MAX_TODO_LISTS, MAX_TODO_STEPS, MAX_TODO_TASKS, PREFS_KEY, TODOS_KEY } from "./constants.js?v=187";
-import { dom, state, tabId } from "./runtime.js?v=187";
-import { safeRead, safeWrite } from "./storage.js?v=187";
-import { showToast } from "./toast.js?v=187";
-import { formatDuration, formatShortDate, localDayKey } from "./utils.js?v=187";
-import { broadcast } from "./sync.js?v=187";
-import { askConfirm, navigate } from "./theme-nav.js?v=187";
+import {
+  MAX_TODO_LISTS, MAX_TODO_STEP_TITLE, MAX_TODO_STEPS, MAX_TODO_TASKS, MAX_TODO_TITLE,
+  PREFS_KEY, TODOS_KEY
+} from "./constants.js?v=202";
+import { dom, state, tabId } from "./runtime.js?v=202";
+import { safeRead, safeWrite } from "./storage.js?v=202";
+import { showToast } from "./toast.js?v=202";
+import { formatDuration, formatShortDate, localDayKey } from "./utils.js?v=202";
+import { broadcast } from "./sync.js?v=202";
+import { askConfirm, navigate } from "./theme-nav.js?v=202";
 
 export const SMART_MYDAY = "myday";
 export const SMART_IMPORTANT = "important";
@@ -20,9 +23,36 @@ const PRIORITIES = ["low", "medium", "high"];
 
 let completedOpen = false;
 let expandedTaskIds = new Set();
+/** In-progress "Next step" text keyed by task id — survives re-renders until committed or discarded. */
+const stepDraftByTaskId = new Map();
 let addDraft = { priority: "medium", dueDate: null };
 let completedFilters = { date: "all", listId: "all", priority: "all", customDate: null };
+const TODO_SORT_KEY = "locked_in_todos_sort_v1";
+const TODO_SORTS = [
+  ["priority", "Priority"],
+  ["due", "Due date"],
+  ["created-new", "Newest created"],
+  ["created-old", "Oldest created"]
+];
+let todoSort = null;
 let todoTimerTickId = null;
+
+function syncStepDraftFromDom(taskId) {
+  const input = document.querySelector(`[data-todo-step-form="${CSS.escape(String(taskId))}"] input`);
+  if (!input) return String(stepDraftByTaskId.get(taskId) || "").trim();
+  const text = String(input.value || "").trim();
+  if (text) stepDraftByTaskId.set(taskId, text);
+  else stepDraftByTaskId.delete(taskId);
+  return text;
+}
+
+function getStepDraft(taskId) {
+  return syncStepDraftFromDom(taskId);
+}
+
+function clearStepDraft(taskId) {
+  stepDraftByTaskId.delete(taskId);
+}
 
 function shiftDayKey(key, days) {
   const d = new Date(`${key}T12:00:00`);
@@ -93,36 +123,32 @@ function completedFiltersHtml(lists) {
   const dayActive = completedFilters.date === "custom" && Boolean(completedFilters.customDate);
   return `
     <div class="todos-completed-filters" role="search" aria-label="Filter completed tasks">
-      <label class="todos-filter-field ${dateActive ? "is-filter-active" : ""}">
-        <span class="visually-hidden">Filter by date</span>
-        <select id="todos-completed-date" aria-label="Filter by date">
-          ${dateOpts.map(([value, label]) => `
-            <option value="${value}" ${completedFilters.date === value ? "selected" : ""}>${escapeHtml(label)}</option>
-          `).join("")}
-        </select>
-      </label>
+      <div class="todos-filter-field ${dateActive ? "is-filter-active" : ""}">
+        ${todoMenuTriggerHtml({
+          id: "todos-completed-date",
+          label: "Filter by date",
+          valueLabel: menuOptionLabel(dateOpts, completedFilters.date, "All dates")
+        })}
+      </div>
       ${completedFilters.date === "custom" ? `
         <button type="button" class="date-field-trigger todo-due-trigger todos-filter-day-btn ${dayActive ? "is-filter-active" : ""}" id="todos-completed-day-btn" data-date-picker-anchor aria-haspopup="dialog" aria-expanded="false" aria-label="Completed on date">
           <span class="date-field-value ${completedFilters.customDate ? "" : "is-empty"}" id="todos-completed-day-display">${escapeHtml(customLabel)}</span>
         </button>
       ` : ""}
-      <label class="todos-filter-field ${listActive ? "is-filter-active" : ""}">
-        <span class="visually-hidden">Filter by list</span>
-        <select id="todos-completed-list" aria-label="Filter by list">
-          <option value="all" ${completedFilters.listId === "all" ? "selected" : ""}>All lists</option>
-          ${lists.map((list) => `
-            <option value="${escapeHtml(list.id)}" ${completedFilters.listId === list.id ? "selected" : ""}>${escapeHtml(list.name)}</option>
-          `).join("")}
-        </select>
-      </label>
-      <label class="todos-filter-field ${priorityActive ? "is-filter-active" : ""}">
-        <span class="visually-hidden">Filter by priority</span>
-        <select id="todos-completed-priority" aria-label="Filter by priority">
-          ${priorityOpts.map(([value, label]) => `
-            <option value="${value}" ${completedFilters.priority === value ? "selected" : ""}>${escapeHtml(label)}</option>
-          `).join("")}
-        </select>
-      </label>
+      <div class="todos-filter-field ${listActive ? "is-filter-active" : ""}">
+        ${todoMenuTriggerHtml({
+          id: "todos-completed-list",
+          label: "Filter by list",
+          valueLabel: menuOptionLabel([["all", "All lists"], ...lists.map((list) => [list.id, list.name])], completedFilters.listId, "All lists")
+        })}
+      </div>
+      <div class="todos-filter-field ${priorityActive ? "is-filter-active" : ""}">
+        ${todoMenuTriggerHtml({
+          id: "todos-completed-priority",
+          label: "Filter by priority",
+          valueLabel: menuOptionLabel(priorityOpts, completedFilters.priority, "All priorities")
+        })}
+      </div>
       ${completedFiltersActive() ? `
         <button type="button" class="button button-ghost button-small" id="todos-completed-filters-clear">Clear</button>
       ` : ""}
@@ -139,14 +165,22 @@ function resetAddDraft() {
   addDraft = { priority: "medium", dueDate: null };
 }
 
+function priorityDisplayLabel(priority) {
+  const p = normalizePriority(priority);
+  return p === "low" ? "Low" : p === "high" ? "High" : "Med";
+}
+
 function syncAddFormDraft() {
   const priority = document.getElementById("todos-add-priority");
   const dueDisplay = document.getElementById("todos-add-due-display");
   if (priority) {
     const p = normalizePriority(addDraft.priority);
-    priority.value = p;
-    priority.closest(".todo-priority-field")?.classList.remove("is-low", "is-medium", "is-high");
-    priority.closest(".todo-priority-field")?.classList.add(`is-${p}`);
+    const label = priorityDisplayLabel(p);
+    priority.classList.remove("is-low", "is-medium", "is-high");
+    priority.classList.add(`is-${p}`);
+    const valueEl = priority.querySelector(".todo-action-value");
+    if (valueEl) valueEl.textContent = label;
+    priority.setAttribute("aria-label", `Priority, ${label}`);
   }
   if (dueDisplay) {
     dueDisplay.textContent = dueLabel(addDraft.dueDate, { empty: "Add date" });
@@ -157,7 +191,7 @@ function syncAddFormDraft() {
 async function openTodoDuePicker(anchor, { id, getValue, setValue, onCommit }) {
   if (!anchor) return;
   // Dynamic import avoids a circular dependency with history.js (backup uses todos).
-  const { toggleCustomDatePicker } = await import("./history.js?v=187");
+  const { toggleCustomDatePicker } = await import("./history.js?v=202");
   toggleCustomDatePicker({ id, getValue, setValue, onCommit, anchor });
 }
 
@@ -182,8 +216,12 @@ function normalizePriority(value) {
   return PRIORITIES.includes(p) ? p : "medium";
 }
 
+function clampTodoTitle(value, max) {
+  return String(value || "").replace(/\r\n/g, "\n").trim().slice(0, max);
+}
+
 function normalizeStep(raw) {
-  const title = String(raw?.title || "").trim().slice(0, 200);
+  const title = clampTodoTitle(raw?.title, MAX_TODO_STEP_TITLE);
   if (!title) return null;
   return {
     id: String(raw?.id || uid("step")),
@@ -194,7 +232,7 @@ function normalizeStep(raw) {
 
 function normalizeTask(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const title = String(raw.title || "").trim().slice(0, 200);
+  const title = clampTodoTitle(raw.title, MAX_TODO_TITLE);
   if (!title) return null;
   const steps = (Array.isArray(raw.steps) ? raw.steps : [])
     .map(normalizeStep)
@@ -227,6 +265,7 @@ function normalizeList(raw, index = 0) {
   return {
     id: String(raw.id || uid("list")),
     name,
+    description: String(raw.description || "").trim().slice(0, 160),
     color,
     createdAt: raw.createdAt || new Date().toISOString(),
     sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Number(raw.sortOrder) : index
@@ -433,27 +472,99 @@ function tasksForView(activeListId) {
   return all.filter((t) => t.listId === activeListId);
 }
 
-function sortTasks(tasks, { completedFirst = false } = {}) {
+function readTodoSort() {
+  if (todoSort) return todoSort;
+  const raw = String(safeRead(TODO_SORT_KEY, "priority") || "priority");
+  todoSort = TODO_SORTS.some(([id]) => id === raw) ? raw : "priority";
+  return todoSort;
+}
+
+function setTodoSort(value) {
+  const next = TODO_SORTS.some(([id]) => id === value) ? value : "priority";
+  todoSort = next;
+  safeWrite(TODO_SORT_KEY, next);
+}
+
+function priorityRank(task) {
+  return { high: 0, medium: 1, low: 2 }[normalizePriority(task?.priority)] ?? 1;
+}
+
+function createdTime(task) {
+  const parsed = Date.parse(task?.createdAt || "");
+  if (Number.isFinite(parsed)) return parsed;
+  return Number(task?.sortOrder) || 0;
+}
+
+function compareByDue(a, b) {
+  const ad = a.dueDate || "";
+  const bd = b.dueDate || "";
+  if (ad && bd && ad !== bd) return ad.localeCompare(bd);
+  if (ad && !bd) return -1;
+  if (!ad && bd) return 1;
+  return 0;
+}
+
+function compareTasks(a, b, mode = readTodoSort()) {
+  if (mode === "due") {
+    const byDue = compareByDue(a, b);
+    if (byDue) return byDue;
+    const byPriority = priorityRank(a) - priorityRank(b);
+    if (byPriority) return byPriority;
+    return createdTime(a) - createdTime(b);
+  }
+  if (mode === "created-new") {
+    const byCreated = createdTime(b) - createdTime(a);
+    if (byCreated) return byCreated;
+    return priorityRank(a) - priorityRank(b);
+  }
+  if (mode === "created-old") {
+    const byCreated = createdTime(a) - createdTime(b);
+    if (byCreated) return byCreated;
+    return priorityRank(a) - priorityRank(b);
+  }
+  const byPriority = priorityRank(a) - priorityRank(b);
+  if (byPriority) return byPriority;
+  const byDue = compareByDue(a, b);
+  if (byDue) return byDue;
+  return createdTime(a) - createdTime(b);
+}
+
+function sortTasks(tasks) {
   return tasks.slice().sort((a, b) => {
-    if (completedFirst && a.completedAt && b.completedAt) {
-      return String(b.completedAt).localeCompare(String(a.completedAt));
-    }
     const ac = a.completedAt ? 1 : 0;
     const bc = b.completedAt ? 1 : 0;
     if (ac !== bc) return ac - bc;
-    if (!a.completedAt && !b.completedAt) {
-      const ap = { high: 0, medium: 1, low: 2 }[a.priority] ?? 1;
-      const bp = { high: 0, medium: 1, low: 2 }[b.priority] ?? 1;
-      if (ap !== bp) return ap - bp;
-      if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate) return a.dueDate.localeCompare(b.dueDate);
-      if (a.dueDate && !b.dueDate) return -1;
-      if (!a.dueDate && b.dueDate) return 1;
-    }
-    if (a.completedAt && b.completedAt) {
-      return String(b.completedAt).localeCompare(String(a.completedAt));
-    }
-    return (a.sortOrder || 0) - (b.sortOrder || 0);
+    return compareTasks(a, b);
   });
+}
+
+function menuOptionLabel(options, value, fallback = "") {
+  return options.find(([id]) => id === value)?.[1] || fallback;
+}
+
+function todoMenuTriggerHtml({ id, label, valueLabel }) {
+  return `
+    <button type="button" class="todo-menu-trigger" id="${id}" aria-haspopup="listbox" aria-expanded="false" aria-label="${escapeHtml(label)}">
+      <span class="todo-menu-value">${escapeHtml(valueLabel)}</span>
+      <span class="todo-menu-caret" aria-hidden="true"></span>
+    </button>
+  `;
+}
+
+function todoSortSelectHtml() {
+  const current = readTodoSort();
+  return `
+    <div class="todos-sort-bar">
+      <div class="todos-filter-field todos-sort-field">
+        <span>Sort</span>
+        ${todoMenuTriggerHtml({
+          id: "todos-sort",
+          label: "Sort tasks",
+          valueLabel: menuOptionLabel(TODO_SORTS, current, "Priority")
+        })}
+      </div>
+    </div>
+  `;
 }
 
 export function getTodosSummary(day = todayKey()) {
@@ -532,8 +643,18 @@ function focusNewListTitleInput() {
   const input = document.getElementById("todos-list-title-input");
   if (!input) return;
   input.focus();
-  // Select the default name so the first keystroke replaces it like a placeholder.
-  input.select();
+  const end = input.value.length;
+  input.setSelectionRange(end, end);
+}
+
+export function setTodoListDescription(id, description) {
+  const list = findList(id);
+  if (!list) return false;
+  const next = String(description || "").replace(/\s+/g, " ").trim().slice(0, 160);
+  if ((list.description || "") === next) return true;
+  list.description = next;
+  saveTodos();
+  return true;
 }
 
 export function setTodoListColor(id, color) {
@@ -576,7 +697,7 @@ export function addTask(title, options = {}) {
     showToast(`You can have up to ${MAX_TODO_TASKS} tasks.`);
     return null;
   }
-  const text = String(title || "").trim().slice(0, 200);
+  const text = clampTodoTitle(title, MAX_TODO_TITLE);
   if (!text) return null;
   let listId = options.listId || null;
   if (isSmartListId(d.activeListId)) {
@@ -605,12 +726,40 @@ export function addTask(title, options = {}) {
 export function updateTaskTitle(id, title) {
   const task = findTask(id);
   if (!task) return false;
-  const next = String(title || "").trim().slice(0, 200);
+  const rawLen = String(title || "").replace(/\r\n/g, "\n").trim().length;
+  const next = clampTodoTitle(title, MAX_TODO_TITLE);
   if (!next) return false;
+  if (rawLen > MAX_TODO_TITLE) {
+    showToast(`Task title capped at ${MAX_TODO_TITLE.toLocaleString()} characters.`);
+  }
   task.title = next;
   saveTodos();
   renderTodos();
   return true;
+}
+
+function fitTodoMultilineField(el) {
+  if (!(el instanceof HTMLTextAreaElement)) return;
+  const focused = document.activeElement === el;
+  el.classList.toggle("is-expanded", focused);
+  el.closest(".todo-task")?.classList.toggle("is-title-expanded", focused && el.hasAttribute("data-todo-title"));
+  el.closest(".todo-step")?.classList.toggle("is-title-expanded", focused && el.hasAttribute("data-todo-step-title"));
+  el.style.height = "auto";
+  if (focused) {
+    // Tall enough for multi-paragraph titles; still scrollable past this.
+    const maxPx = Math.round(Math.min(window.innerHeight * 0.55, 520));
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 0), maxPx)}px`;
+  } else {
+    el.style.height = "";
+  }
+}
+
+function fitTodosAddInput() {
+  const el = document.getElementById("todos-add-input");
+  if (!(el instanceof HTMLTextAreaElement)) return;
+  el.style.height = "auto";
+  const maxPx = Math.round(Math.min(window.innerHeight * 0.35, 280));
+  el.style.height = `${Math.min(Math.max(el.scrollHeight, 28), maxPx)}px`;
 }
 
 export function toggleTaskComplete(id) {
@@ -656,6 +805,7 @@ export function deleteTask(id) {
   d.tasks = d.tasks.filter((t) => t.id !== id);
   if (d.tasks.length === prev) return false;
   expandedTaskIds.delete(id);
+  clearStepDraft(id);
   saveTodos();
   renderTodos();
   renderSetupTodosWidget();
@@ -673,14 +823,22 @@ export function addStep(taskId, title) {
   const step = normalizeStep({ id: uid("step"), title });
   if (!step) return null;
   task.steps.push(step);
+  clearStepDraft(taskId);
   expandedTaskIds.add(taskId);
   saveTodos();
   renderTodos();
   queueMicrotask(() => {
-    const input = document.querySelector(`[data-todo-step-form="${taskId}"] input`);
+    const input = document.querySelector(`[data-todo-step-form="${CSS.escape(String(taskId))}"] input`);
     input?.focus();
   });
   return step;
+}
+
+/** Commit the open "Next step" draft if any. Returns true when a step was added. */
+export function commitStepDraft(taskId) {
+  const text = getStepDraft(taskId);
+  if (!text) return false;
+  return Boolean(addStep(taskId, text));
 }
 
 export function updateStepTitle(taskId, stepId, title) {
@@ -688,8 +846,12 @@ export function updateStepTitle(taskId, stepId, title) {
   if (!task) return false;
   const step = task.steps.find((s) => s.id === stepId);
   if (!step) return false;
-  const next = String(title || "").trim().slice(0, 200);
+  const rawLen = String(title || "").replace(/\r\n/g, "\n").trim().length;
+  const next = clampTodoTitle(title, MAX_TODO_STEP_TITLE);
   if (!next) return false;
+  if (rawLen > MAX_TODO_STEP_TITLE) {
+    showToast(`Step title capped at ${MAX_TODO_STEP_TITLE.toLocaleString()} characters.`);
+  }
   step.title = next;
   saveTodos();
   return true;
@@ -728,7 +890,7 @@ function viewMeta(activeListId) {
   const list = findList(activeListId);
   return {
     title: list?.name || "Tasks",
-    subtitle: "Custom list",
+    subtitle: list?.description || "",
     color: list?.color || LIST_COLORS[0],
     editable: true,
     list
@@ -759,7 +921,7 @@ function renderRail() {
       `).join("")}
     </div>
     <div class="todos-rail-divider" aria-hidden="true"></div>
-    <div class="todos-rail-section" role="list" aria-label="Your lists">
+    <div class="todos-rail-section todos-rail-lists" role="list" aria-label="Your lists">
       ${d.lists.map((list) => {
         const count = d.tasks.filter((t) => t.listId === list.id && !t.completedAt).length;
         return `
@@ -775,26 +937,356 @@ function renderRail() {
   `;
 }
 
+const PRIORITY_MENU_OPTIONS = [
+  ["low", "Low"],
+  ["medium", "Medium"],
+  ["high", "High"]
+];
+
+let priorityMenu = null;
+let priorityMenuAnchor = null;
+
 function prioritySelectHtml({ priority, selectId = "", taskId = "", disabled = false } = {}) {
   const p = normalizePriority(priority);
   const idAttr = selectId ? ` id="${selectId}"` : "";
-  const taskAttr = taskId ? ` data-todo-priority="${taskId}"` : "";
-  const opts = [
-    ["low", "Low"],
-    ["medium", "Med"],
-    ["high", "High"]
-  ];
+  const taskAttr = taskId ? ` data-todo-priority="${escapeHtml(taskId)}"` : "";
+  const label = priorityDisplayLabel(p);
   return `
-    <label class="todo-action-btn todo-priority-field is-${p}">
+    <button type="button" class="todo-action-btn todo-priority-trigger is-${p}"${idAttr}${taskAttr} aria-haspopup="listbox" aria-expanded="false" aria-label="Priority, ${label}" ${disabled ? "disabled" : ""}>
       <span class="todo-action-label">Priority</span>
-      <select class="todo-priority-select"${idAttr}${taskAttr} aria-label="Priority" ${disabled ? "disabled" : ""}>
-        ${opts.map(([value, label]) => `
-          <option value="${value}" ${p === value ? "selected" : ""}>${label}</option>
-        `).join("")}
-      </select>
+      <span class="todo-action-value">${label}</span>
       <span class="todo-action-caret" aria-hidden="true">▾</span>
-    </label>
+    </button>
   `;
+}
+
+function ensurePriorityMenu() {
+  if (priorityMenu) return priorityMenu;
+  const menu = document.createElement("div");
+  menu.className = "todo-priority-menu";
+  menu.hidden = true;
+  menu.setAttribute("role", "listbox");
+  menu.setAttribute("aria-label", "Priority");
+  menu.innerHTML = PRIORITY_MENU_OPTIONS.map(([value, label]) => `
+    <button type="button" class="todo-priority-option is-${value}" role="option" data-value="${value}">
+      <span class="todo-priority-dot" aria-hidden="true"></span>
+      <span>${label}</span>
+    </button>
+  `).join("");
+  document.body.appendChild(menu);
+  menu.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-value]");
+    if (!option) return;
+    event.preventDefault();
+    applyPriorityFromMenu(option.dataset.value);
+  });
+  menu.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    const options = [...menu.querySelectorAll("[data-value]")];
+    const current = options.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      const anchor = priorityMenuAnchor;
+      closePriorityMenu();
+      anchor?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const dir = event.key === "ArrowDown" ? 1 : -1;
+      const start = current < 0 ? (dir === 1 ? -1 : 0) : current;
+      const next = options[(start + dir + options.length) % options.length];
+      next?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      options[0]?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      options.at(-1)?.focus({ preventScroll: true });
+    }
+  });
+  priorityMenu = menu;
+  return menu;
+}
+
+function closePriorityMenu() {
+  priorityMenuAnchor?.setAttribute("aria-expanded", "false");
+  priorityMenuAnchor = null;
+  if (!priorityMenu) return;
+  priorityMenu.hidden = true;
+}
+
+let optionMenu = null;
+let optionMenuAnchor = null;
+let optionMenuOnSelect = null;
+
+function closeOptionMenu() {
+  optionMenuAnchor?.setAttribute("aria-expanded", "false");
+  optionMenuAnchor = null;
+  optionMenuOnSelect = null;
+  if (!optionMenu) return;
+  optionMenu.hidden = true;
+}
+
+function positionFloatingMenu(menu, anchor, minWidth) {
+  menu.hidden = false;
+  menu.style.visibility = "hidden";
+  const rect = anchor.getBoundingClientRect();
+  const menuRect = menu.getBoundingClientRect();
+  const margin = 8;
+  const width = Math.max(menuRect.width, rect.width, minWidth);
+  let top = rect.bottom + 6;
+  if (top + menuRect.height > window.innerHeight - margin) {
+    top = rect.top - menuRect.height - 6;
+  }
+  let left = rect.left;
+  if (left + width > window.innerWidth - margin) {
+    left = window.innerWidth - width - margin;
+  }
+  menu.style.top = `${Math.max(margin, Math.round(top))}px`;
+  menu.style.left = `${Math.max(margin, Math.round(left))}px`;
+  menu.style.minWidth = `${Math.round(Math.max(rect.width, minWidth))}px`;
+  menu.style.visibility = "";
+}
+
+function ensureOptionMenu() {
+  if (optionMenu) return optionMenu;
+  const menu = document.createElement("div");
+  menu.className = "todo-priority-menu todo-option-menu";
+  menu.hidden = true;
+  menu.setAttribute("role", "listbox");
+  document.body.appendChild(menu);
+  menu.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-value]");
+    if (!option || !optionMenuOnSelect) return;
+    event.preventDefault();
+    const choose = optionMenuOnSelect;
+    const value = option.dataset.value;
+    closeOptionMenu();
+    choose(value);
+  });
+  menu.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    const options = [...menu.querySelectorAll("[data-value]")];
+    const current = options.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      const anchor = optionMenuAnchor;
+      closeOptionMenu();
+      anchor?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const dir = event.key === "ArrowDown" ? 1 : -1;
+      const start = current < 0 ? (dir === 1 ? -1 : 0) : current;
+      const next = options[(start + dir + options.length) % options.length];
+      next?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      options[0]?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      options.at(-1)?.focus({ preventScroll: true });
+    }
+  });
+  optionMenu = menu;
+  return menu;
+}
+
+function completedDateOptions() {
+  return [
+    ["all", "All dates"],
+    ["today", "Today"],
+    ["yesterday", "Yesterday"],
+    ["week", "Last 7 days"],
+    ["month", "Last 30 days"],
+    ["custom", "Pick a day"]
+  ];
+}
+
+function completedListOptions() {
+  return [["all", "All lists"], ...(doc().lists || []).map((list) => [list.id, list.name])];
+}
+
+function completedPriorityOptions() {
+  return [
+    ["all", "All priorities"],
+    ["high", "High"],
+    ["medium", "Med"],
+    ["low", "Low"]
+  ];
+}
+
+function setupSourceOptions() {
+  return [
+    ["focus", "Focus mix"],
+    ["myday", "My Day"],
+    ["important", "Important"],
+    ["overdue", "Overdue"],
+    ["open", "All open"],
+    ...(doc().lists || []).map((list) => [list.id, list.name])
+  ];
+}
+
+function todoMenuSpec(id) {
+  if (id === "todos-sort") {
+    return { label: "Sort tasks", value: readTodoSort(), options: TODO_SORTS };
+  }
+  if (id === "todos-completed-date") {
+    return { label: "Filter by date", value: completedFilters.date, options: completedDateOptions() };
+  }
+  if (id === "todos-completed-list") {
+    return { label: "Filter by list", value: completedFilters.listId, options: completedListOptions() };
+  }
+  if (id === "todos-completed-priority") {
+    return { label: "Filter by priority", value: completedFilters.priority, options: completedPriorityOptions() };
+  }
+  if (id === "setup-todos-source") {
+    return { label: "Choose which tasks to show", value: setupTodosSource(), options: setupSourceOptions() };
+  }
+  return null;
+}
+
+function applyTodoMenuValue(id, value) {
+  if (id === "todos-sort") {
+    setTodoSort(value);
+    renderTodos();
+  } else if (id === "todos-completed-date") {
+    completedFilters.date = value || "all";
+    if (completedFilters.date !== "custom") completedFilters.customDate = null;
+    if (completedFilters.date === "custom" && !completedFilters.customDate) {
+      completedFilters.customDate = todayKey();
+    }
+    renderTodos();
+  } else if (id === "todos-completed-list") {
+    completedFilters.listId = value || "all";
+    renderTodos();
+  } else if (id === "todos-completed-priority") {
+    completedFilters.priority = value || "all";
+    renderTodos();
+  } else if (id === "setup-todos-source") {
+    state.prefs.setupTodosSource = normalizeSetupTodosSource(value);
+    if (!safeWrite(PREFS_KEY, state.prefs)) {
+      showToast("Could not save preferences — browser storage unavailable.");
+    }
+    renderSetupTodosWidget();
+  } else {
+    return;
+  }
+  queueMicrotask(() => document.getElementById(id)?.focus({ preventScroll: true }));
+}
+
+function openTodoOptionMenu(anchor) {
+  if (!anchor) return;
+  if (optionMenuAnchor === anchor && optionMenu && !optionMenu.hidden) {
+    closeOptionMenu();
+    return;
+  }
+  const spec = todoMenuSpec(anchor.id);
+  if (!spec) return;
+  closeOptionMenu();
+  closePriorityMenu();
+  const menu = ensureOptionMenu();
+  menu.setAttribute("aria-label", spec.label);
+  menu.replaceChildren();
+  spec.options.forEach(([value, label]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "todo-priority-option";
+    btn.setAttribute("role", "option");
+    btn.dataset.value = value;
+    btn.textContent = label;
+    const selected = value === spec.value;
+    btn.classList.toggle("is-selected", selected);
+    btn.setAttribute("aria-selected", selected ? "true" : "false");
+    menu.append(btn);
+  });
+  optionMenuOnSelect = (value) => applyTodoMenuValue(anchor.id, value);
+  optionMenuAnchor = anchor;
+  anchor.setAttribute("aria-expanded", "true");
+  positionFloatingMenu(menu, anchor, Math.max(148, anchor.getBoundingClientRect().width));
+  const selected = menu.querySelector(".is-selected") || menu.querySelector("[data-value]");
+  selected?.focus({ preventScroll: true });
+}
+
+function positionPriorityMenu(anchor) {
+  const menu = ensurePriorityMenu();
+  menu.hidden = false;
+  menu.style.visibility = "hidden";
+  const rect = anchor.getBoundingClientRect();
+  const menuRect = menu.getBoundingClientRect();
+  const margin = 8;
+  const width = Math.max(menuRect.width, rect.width, 148);
+  let top = rect.bottom + 6;
+  if (top + menuRect.height > window.innerHeight - margin) {
+    top = rect.top - menuRect.height - 6;
+  }
+  let left = rect.left;
+  if (left + width > window.innerWidth - margin) {
+    left = window.innerWidth - width - margin;
+  }
+  menu.style.top = `${Math.max(margin, Math.round(top))}px`;
+  menu.style.left = `${Math.max(margin, Math.round(left))}px`;
+  menu.style.minWidth = `${Math.round(Math.max(rect.width, 148))}px`;
+  menu.style.visibility = "";
+}
+
+function priorityValueForTrigger(anchor) {
+  if (!anchor) return "medium";
+  if (anchor.id === "todos-add-priority") return normalizePriority(addDraft.priority);
+  return normalizePriority(findTask(anchor.dataset.todoPriority)?.priority);
+}
+
+function openPriorityMenu(anchor) {
+  if (!anchor || anchor.disabled) return;
+  if (priorityMenuAnchor === anchor && priorityMenu && !priorityMenu.hidden) {
+    closePriorityMenu();
+    return;
+  }
+  closeOptionMenu();
+  closePriorityMenu();
+  const menu = ensurePriorityMenu();
+  const current = priorityValueForTrigger(anchor);
+  menu.querySelectorAll("[data-value]").forEach((btn) => {
+    const on = btn.dataset.value === current;
+    btn.classList.toggle("is-selected", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  priorityMenuAnchor = anchor;
+  anchor.setAttribute("aria-expanded", "true");
+  positionPriorityMenu(anchor);
+  const selected = menu.querySelector(".is-selected") || menu.querySelector("[data-value]");
+  selected?.focus({ preventScroll: true });
+}
+
+function applyPriorityFromMenu(value) {
+  const anchor = priorityMenuAnchor;
+  const next = normalizePriority(value);
+  closePriorityMenu();
+  if (!anchor) return;
+  if (anchor.id === "todos-add-priority") {
+    addDraft.priority = next;
+    syncAddFormDraft();
+    anchor.focus({ preventScroll: true });
+    return;
+  }
+  const taskId = anchor.dataset.todoPriority;
+  const task = findTask(taskId);
+  if (!task || task.completedAt) return;
+  setTaskPriority(task.id, next);
+  const safeId = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(task.id) : String(task.id).replace(/"/g, "");
+  queueMicrotask(() => {
+    document.querySelector(`[data-todo-priority="${safeId}"]`)?.focus({ preventScroll: true });
+  });
 }
 
 function dueTriggerHtml({
@@ -848,7 +1340,7 @@ function renderTaskRow(task) {
           <span aria-hidden="true"></span>
         </label>
         <div class="todo-task-body">
-          <input class="todo-task-title" data-todo-title="${task.id}" value="${escapeHtml(task.title)}" aria-label="Task title" ${task.completedAt ? "readonly" : ""}>
+          <textarea class="todo-task-title" data-todo-title="${task.id}" rows="1" maxlength="${MAX_TODO_TITLE}" aria-label="Task title" ${task.completedAt ? "readonly" : ""}>${escapeHtml(task.title)}</textarea>
           <div class="todo-task-meta">
             ${list && isSmartListId(doc().activeListId)
               ? `<span class="todo-chip">${escapeHtml(list.name)}</span>` : ""}
@@ -856,7 +1348,7 @@ function renderTaskRow(task) {
               ? `<span class="todo-chip">Done ${escapeHtml(dueLabel(localDayKey(task.completedAt), { empty: "" }))}</span>` : ""}
             ${took ? `<span class="todo-chip todo-chip-took">Took ${escapeHtml(took)}</span>` : ""}
             ${taskTimerControlsHtml(task)}
-            <button type="button" class="todo-chip todo-chip-steps ${expanded ? "is-open" : ""}" data-todo-expand="${task.id}" aria-expanded="${expanded}">
+            <button type="button" class="todo-chip todo-chip-steps ${expanded ? "is-open" : ""}" data-todo-expand="${task.id}" aria-expanded="${expanded}" title="${expanded ? "Hide steps" : (task.steps.length ? "Show steps" : "Add steps")}">
               ${task.steps.length ? `${stepsDone}/${task.steps.length} steps` : "+ Steps"}
             </button>
           </div>
@@ -878,20 +1370,25 @@ function renderTaskRow(task) {
       </div>
       ${expanded ? `
         <div class="todo-steps">
-          ${task.steps.map((step) => `
-            <div class="todo-step ${step.completedAt ? "is-completed" : ""}" data-step-id="${step.id}">
-              <label class="todo-check">
-                <input type="checkbox" data-todo-step-complete="${task.id}" data-step-id="${step.id}" ${step.completedAt ? "checked" : ""} aria-label="Complete step">
-                <span aria-hidden="true"></span>
-              </label>
-              <input class="todo-step-title" data-todo-step-title="${task.id}" data-step-id="${step.id}" value="${escapeHtml(step.title)}" aria-label="Step title" ${task.completedAt ? "readonly" : ""}>
-              <button type="button" class="todo-icon-btn todo-danger" data-todo-step-delete="${task.id}" data-step-id="${step.id}" aria-label="Delete step">✕</button>
+          ${task.steps.length ? `
+            <div class="todo-steps-list" role="list" aria-label="Steps">
+              ${task.steps.map((step) => `
+                <div class="todo-step ${step.completedAt ? "is-completed" : ""}" data-step-id="${step.id}" role="listitem">
+                  <label class="todo-check">
+                    <input type="checkbox" data-todo-step-complete="${task.id}" data-step-id="${step.id}" ${step.completedAt ? "checked" : ""} aria-label="Complete step">
+                    <span aria-hidden="true"></span>
+                  </label>
+                  <textarea class="todo-step-title" data-todo-step-title="${task.id}" data-step-id="${step.id}" rows="1" maxlength="${MAX_TODO_STEP_TITLE}" aria-label="Step title" ${task.completedAt ? "readonly" : ""}>${escapeHtml(step.title)}</textarea>
+                  <button type="button" class="todo-icon-btn todo-danger" data-todo-step-delete="${task.id}" data-step-id="${step.id}" aria-label="Delete step">✕</button>
+                </div>
+              `).join("")}
             </div>
-          `).join("")}
+          ` : `<p class="todo-steps-empty">Break this task into smaller steps.</p>`}
           ${task.completedAt ? "" : `
             <form class="todo-step-form" data-todo-step-form="${task.id}">
-              <span class="todo-check" aria-hidden="true"><span></span></span>
-              <input type="text" maxlength="200" placeholder="Next step" aria-label="Add a step" autocomplete="off">
+              <span class="todo-step-add-mark" aria-hidden="true">+</span>
+              <input type="text" maxlength="${MAX_TODO_STEP_TITLE}" placeholder="Add a step" aria-label="Add a step" autocomplete="off" value="${escapeHtml(stepDraftByTaskId.get(task.id) || "")}">
+              <button type="submit" class="todo-step-add-btn">Add</button>
             </form>
           `}
         </div>
@@ -907,10 +1404,7 @@ function renderMain() {
   const meta = viewMeta(d.activeListId);
   const completedOnly = Boolean(meta.completedOnly);
   const rawTasks = tasksForView(d.activeListId);
-  const tasks = sortTasks(
-    completedOnly ? filterCompletedTasks(rawTasks) : rawTasks,
-    { completedFirst: completedOnly }
-  );
+  const tasks = sortTasks(completedOnly ? filterCompletedTasks(rawTasks) : rawTasks);
   const open = completedOnly ? [] : tasks.filter((t) => !t.completedAt);
   const done = completedOnly ? tasks : tasks.filter((t) => t.completedAt);
   const totalCompleted = completedOnly ? rawTasks.length : 0;
@@ -922,9 +1416,11 @@ function renderMain() {
     <header class="todos-main-header" style="--todo-list-accent:${meta.color}">
       <div class="todos-main-heading">
         ${meta.editable
-          ? `<input class="todos-list-title-input" id="todos-list-title-input" value="${escapeHtml(meta.title)}" maxlength="60" placeholder="New list" aria-label="List name" autocomplete="off" spellcheck="false">`
+          ? `<input class="todos-list-title-input" id="todos-list-title-input" value="${escapeHtml(meta.title)}" maxlength="60" placeholder="List name" aria-label="List name" autocomplete="off" spellcheck="false">`
           : `<h2 id="todos-main-title">${escapeHtml(meta.title)}</h2>`}
-        <p class="local-data-note">${escapeHtml(meta.subtitle)}</p>
+        ${meta.editable
+          ? `<input class="todos-list-desc-input" id="todos-list-desc-input" value="${escapeHtml(meta.list?.description || "")}" maxlength="160" placeholder="Add a description" aria-label="List description" autocomplete="off">`
+          : `<p class="local-data-note">${escapeHtml(meta.subtitle)}</p>`}
       </div>
       ${meta.editable ? `
         <div class="todos-list-tools">
@@ -937,13 +1433,14 @@ function renderMain() {
         </div>
       ` : ""}
     </header>
+    ${todoSortSelectHtml()}
 
     ${completedOnly ? "" : `
     <form class="todos-add-form" id="todos-add-form" aria-label="Create a new task">
       <span class="todos-add-plus" aria-hidden="true">+</span>
       <div class="todos-add-fields">
         <label class="todos-add-label" for="todos-add-input">New task</label>
-        <input id="todos-add-input" type="text" maxlength="200" placeholder="What needs doing?" aria-label="New task title" required autocomplete="off">
+        <textarea id="todos-add-input" rows="1" maxlength="${MAX_TODO_TITLE}" placeholder="What needs doing?" aria-label="New task title" required autocomplete="off"></textarea>
       </div>
       <div class="todos-add-tools">
         ${prioritySelectHtml({ priority: addDraft.priority, selectId: "todos-add-priority" })}
@@ -958,6 +1455,7 @@ function renderMain() {
     </form>
     `}
 
+    <div class="todos-list-scroll">
     ${completedOnly ? `
     ${completedFiltersHtml(d.lists)}
     <p class="todos-filter-count" aria-live="polite">
@@ -984,11 +1482,14 @@ function renderMain() {
       </section>
     ` : ""}
     `}
+    </div>
   `;
   syncAddFormDraft();
 }
 
 export function renderTodos() {
+  closePriorityMenu();
+  closeOptionMenu();
   if (!state.todos) loadTodos();
   renderRail();
   renderMain();
@@ -1035,20 +1536,13 @@ function setupPreviewTasks(day = todayKey(), source = setupTodosSource()) {
 }
 
 function syncSetupTodosSourceSelect() {
-  const select = dom.setupTodosSource;
-  if (!select) return;
+  const trigger = dom.setupTodosSource;
+  if (!trigger) return;
   const source = setupTodosSource();
-  const lists = doc().lists || [];
-  select.innerHTML = `
-    <option value="focus">Focus mix</option>
-    <option value="myday">My Day</option>
-    <option value="important">Important</option>
-    <option value="overdue">Overdue</option>
-    <option value="open">All open</option>
-    ${lists.map((list) => `<option value="${escapeHtml(list.id)}">${escapeHtml(list.name)}</option>`).join("")}
-  `;
-  select.value = source;
-  if (select.value !== source) select.value = "focus";
+  const label = menuOptionLabel(setupSourceOptions(), source, "Focus mix");
+  const valueEl = trigger.querySelector(".todo-menu-value");
+  if (valueEl) valueEl.textContent = label;
+  trigger.dataset.value = source;
 }
 
 function setupSourceLabel(source = setupTodosSource()) {
@@ -1187,13 +1681,6 @@ export function bindTodoEvents() {
   if (dom.setupTodosWidget && dom.setupTodosWidget.dataset.bound !== "1") {
     dom.setupTodosWidget.dataset.bound = "1";
     dom.setupTodosOpenBtn?.addEventListener("click", () => openTodosFromSetup(setupTodosSource()));
-    dom.setupTodosSource?.addEventListener("change", () => {
-      state.prefs.setupTodosSource = normalizeSetupTodosSource(dom.setupTodosSource.value);
-      if (!safeWrite(PREFS_KEY, state.prefs)) {
-        showToast("Could not save preferences — browser storage unavailable.");
-      }
-      renderSetupTodosWidget();
-    });
     dom.setupTodosWidget.addEventListener("click", (event) => {
       const completeBtn = event.target.closest("[data-setup-todo-complete]");
       if (completeBtn) {
@@ -1205,7 +1692,7 @@ export function bindTodoEvents() {
       if (focusTask) {
         event.preventDefault();
         const id = focusTask.dataset.setupTodoFocus;
-        import("./setup.js?v=187").then(({ linkTodoToSetup }) => {
+        import("./setup.js?v=202").then(({ linkTodoToSetup }) => {
           if (linkTodoToSetup(id)) {
             showToast("To-do linked to your focus goal.");
             dom.taskIntent?.focus();
@@ -1277,6 +1764,12 @@ export function bindTodoEvents() {
       });
       return;
     }
+    const priorityTrigger = event.target.closest(".todo-priority-trigger");
+    if (priorityTrigger) {
+      event.preventDefault();
+      openPriorityMenu(priorityTrigger);
+      return;
+    }
     if (event.target.closest("#todos-add-clear")) {
       resetAddDraft();
       const input = document.getElementById("todos-add-input");
@@ -1316,15 +1809,20 @@ export function bindTodoEvents() {
     const expandBtn = event.target.closest("[data-todo-expand]");
     if (expandBtn) {
       const id = expandBtn.dataset.todoExpand;
-      const opening = !expandedTaskIds.has(id);
-      if (opening) expandedTaskIds.add(id);
-      else expandedTaskIds.delete(id);
-      renderTodos();
-      if (opening) {
-        queueMicrotask(() => {
-          document.querySelector(`[data-todo-step-form="${id}"] input`)?.focus();
-        });
+      const isOpen = expandedTaskIds.has(id);
+      if (isOpen) {
+        // Save any typed draft, then collapse — Add / Enter keep the panel open for the next step.
+        commitStepDraft(id);
+        clearStepDraft(id);
+        expandedTaskIds.delete(id);
+        renderTodos();
+        return;
       }
+      expandedTaskIds.add(id);
+      renderTodos();
+      queueMicrotask(() => {
+        document.querySelector(`[data-todo-step-form="${CSS.escape(String(id))}"] input`)?.focus();
+      });
       return;
     }
     const delBtn = event.target.closest("[data-todo-delete]");
@@ -1355,38 +1853,6 @@ export function bindTodoEvents() {
     const stepComplete = event.target.closest("[data-todo-step-complete]");
     if (stepComplete) {
       toggleStep(stepComplete.dataset.todoStepComplete, stepComplete.dataset.stepId);
-      return;
-    }
-    if (event.target.id === "todos-add-priority") {
-      addDraft.priority = normalizePriority(event.target.value);
-      syncAddFormDraft();
-      return;
-    }
-    const prioritySelect = event.target.closest("[data-todo-priority]");
-    if (prioritySelect) {
-      const task = findTask(prioritySelect.dataset.todoPriority);
-      if (task && !task.completedAt) {
-        setTaskPriority(task.id, prioritySelect.value);
-      }
-      return;
-    }
-    if (event.target.id === "todos-completed-date") {
-      completedFilters.date = event.target.value || "all";
-      if (completedFilters.date !== "custom") completedFilters.customDate = null;
-      if (completedFilters.date === "custom" && !completedFilters.customDate) {
-        completedFilters.customDate = todayKey();
-      }
-      renderTodos();
-      return;
-    }
-    if (event.target.id === "todos-completed-list") {
-      completedFilters.listId = event.target.value || "all";
-      renderTodos();
-      return;
-    }
-    if (event.target.id === "todos-completed-priority") {
-      completedFilters.priority = event.target.value || "all";
-      renderTodos();
     }
   });
 
@@ -1404,26 +1870,51 @@ export function bindTodoEvents() {
         resetAddDraft();
         syncAddFormDraft();
         input?.focus();
+        fitTodosAddInput();
       }
       return;
     }
     const stepForm = event.target.closest("[data-todo-step-form]");
     if (stepForm) {
       event.preventDefault();
-      const input = stepForm.querySelector("input");
-      const text = String(input?.value || "").trim();
-      if (!text) return;
-      addStep(stepForm.dataset.todoStepForm, text);
+      const taskId = stepForm.dataset.todoStepForm;
+      syncStepDraftFromDom(taskId);
+      commitStepDraft(taskId);
     }
   });
 
-  screen.addEventListener("focusin", (event) => {
-    const listTitle = event.target.closest("#todos-list-title-input");
-    if (!listTitle) return;
-    // Default name behaves like a placeholder: highlight so typing replaces it.
-    if (listTitle.value.trim() === "New list") {
-      queueMicrotask(() => listTitle.select());
+  screen.addEventListener("input", (event) => {
+    const stepAdd = event.target.closest("[data-todo-step-form] input");
+    if (stepAdd) {
+      const taskId = stepAdd.closest("[data-todo-step-form]")?.dataset.todoStepForm;
+      if (taskId) syncStepDraftFromDom(taskId);
+      return;
     }
+    if (event.target.id === "todos-add-input") {
+      fitTodosAddInput();
+      return;
+    }
+    const multiTitle = event.target.closest("textarea[data-todo-title], textarea[data-todo-step-title]");
+    if (multiTitle) fitTodoMultilineField(multiTitle);
+  });
+
+  screen.addEventListener("focusin", (event) => {
+    if (event.target.id === "todos-add-input") {
+      fitTodosAddInput();
+      return;
+    }
+    const multiTitle = event.target.closest("textarea[data-todo-title], textarea[data-todo-step-title]");
+    if (multiTitle) {
+      fitTodoMultilineField(multiTitle);
+      return;
+    }
+  });
+
+  screen.addEventListener("focusout", (event) => {
+    const multiTitle = event.target.closest("textarea[data-todo-title], textarea[data-todo-step-title]");
+    if (!multiTitle) return;
+    // Collapse after the related blur/change handlers run.
+    queueMicrotask(() => fitTodoMultilineField(multiTitle));
   });
 
   screen.addEventListener("change", (event) => {
@@ -1436,9 +1927,17 @@ export function bindTodoEvents() {
     }
     const listTitle = event.target.closest("#todos-list-title-input");
     if (listTitle) renameTodoList(doc().activeListId, listTitle.value);
+    const listDesc = event.target.closest("#todos-list-desc-input");
+    if (listDesc) setTodoListDescription(doc().activeListId, listDesc.value);
   });
 
   screen.addEventListener("keydown", (event) => {
+    const priorityTrigger = event.target.closest(".todo-priority-trigger");
+    if (priorityTrigger && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      openPriorityMenu(priorityTrigger);
+      return;
+    }
     const stepAdd = event.target.closest("[data-todo-step-form] input");
     if (stepAdd && event.key === "Enter") {
       event.preventDefault();
@@ -1449,16 +1948,61 @@ export function bindTodoEvents() {
       event.preventDefault();
       const taskId = stepAdd.closest("[data-todo-step-form]")?.dataset.todoStepForm;
       if (taskId) {
+        clearStepDraft(taskId);
         expandedTaskIds.delete(taskId);
         renderTodos();
       }
       return;
     }
-    const titleInput = event.target.closest("[data-todo-title], #todos-list-title-input, [data-todo-step-title]");
+    if (event.target.id === "todos-add-input" && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      event.target.closest("form")?.requestSubmit();
+      return;
+    }
+    const multiTitle = event.target.closest("textarea[data-todo-title], textarea[data-todo-step-title]");
+    if (multiTitle) {
+      // Enter inserts a new line; Escape collapses.
+      if (event.key === "Escape") {
+        event.preventDefault();
+        multiTitle.blur();
+      }
+      return;
+    }
+    const titleInput = event.target.closest("#todos-list-title-input, #todos-list-desc-input");
     if (titleInput && event.key === "Enter") {
       event.preventDefault();
       titleInput.blur();
     }
   });
 
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest(".todo-menu-trigger");
+    if (!trigger) return;
+    event.preventDefault();
+    openTodoOptionMenu(trigger);
+  });
+  document.addEventListener("keydown", (event) => {
+    const trigger = event.target.closest?.(".todo-menu-trigger");
+    if (!trigger || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openTodoOptionMenu(trigger);
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (optionMenu && !optionMenu.hidden && !optionMenu.contains(event.target) && !optionMenuAnchor?.contains(event.target)) {
+      closeOptionMenu();
+    }
+    if (!priorityMenu || priorityMenu.hidden) return;
+    if (priorityMenu.contains(event.target)) return;
+    if (priorityMenuAnchor?.contains(event.target)) return;
+    closePriorityMenu();
+  }, true);
+  window.addEventListener("resize", () => {
+    closePriorityMenu();
+    closeOptionMenu();
+  });
+  window.addEventListener("scroll", () => {
+    if (priorityMenu && !priorityMenu.hidden) closePriorityMenu();
+    if (optionMenu && !optionMenu.hidden) closeOptionMenu();
+  }, true);
 }

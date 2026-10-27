@@ -1,8 +1,8 @@
 /** Weekly goal rollover reports — history stays intact; progress window resets. */
-import { FOCUS_GOALS_KEY, MAX_WEEK_REPORTS, WEEK_REPORTS_KEY } from "./constants.js?v=187";
-import { dom, state } from "./runtime.js?v=187";
-import { safeRead, safeWrite } from "./storage.js?v=187";
-import { showToast } from "./toast.js?v=187";
+import { FOCUS_GOALS_KEY, MAX_WEEK_REPORTS, WEEK_REPORTS_KEY } from "./constants.js?v=202";
+import { dom, state } from "./runtime.js?v=202";
+import { safeRead, safeWrite } from "./storage.js?v=202";
+import { showToast } from "./toast.js?v=202";
 import {
   download,
   endOfWeek,
@@ -12,8 +12,8 @@ import {
   scoreFor,
   startOfWeek,
   WEEKDAY_OPTIONS
-} from "./utils.js?v=187";
-import { completionDurationLabel } from "./todos.js?v=187";
+} from "./utils.js?v=202";
+import { completionDurationLabel } from "./todos.js?v=202";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -57,6 +57,12 @@ export function currentProgressWindow(now = new Date()) {
     start = new Date(calendarStart);
     startKey = localDayKey(start);
   }
+  // A mid-week reset starts the window at that instant, not at midnight,
+  // so focus already saved today does not keep filling the bars.
+  const cutoff = Date.parse(state.focusGoals?.progressResetAt);
+  if (Number.isFinite(cutoff) && cutoff > start.getTime() && cutoff <= now.getTime()) {
+    start = new Date(cutoff);
+  }
   return { start, end: calendarEnd, startKey, calendarStartKey: localDayKey(calendarStart) };
 }
 
@@ -66,7 +72,8 @@ function persistFocusGoalsMeta() {
     dailyMinutes: g.dailyMinutes,
     weeklyMinutes: g.weeklyMinutes,
     weekStartsOn: g.weekStartsOn,
-    activeWeekKey: g.activeWeekKey || null
+    activeWeekKey: g.activeWeekKey || null,
+    progressResetAt: Number.isFinite(Date.parse(g.progressResetAt)) ? new Date(g.progressResetAt).toISOString() : null
   });
 }
 
@@ -90,7 +97,7 @@ export function buildWeekReportForRange(startInput, endInput, {
   dailyMinutes = state.focusGoals?.dailyMinutes,
   idSuffix = ""
 } = {}) {
-  const start = dayStart(startInput);
+  const start = startInput instanceof Date ? new Date(startInput.getTime()) : dayStart(startInput);
   const end = endInput instanceof Date ? new Date(endInput) : dayStart(endInput);
   if (!(start instanceof Date) || Number.isNaN(start.getTime())) return null;
   if (!(end instanceof Date) || Number.isNaN(end.getTime())) return null;
@@ -101,10 +108,13 @@ export function buildWeekReportForRange(startInput, endInput, {
   const weekEndKey = localDayKey(end);
   const sessions = (state.history || []).filter((r) => inRange(r.completedAt, start, end));
   const completedSessions = sessions.filter((r) => r.outcome === "completed");
-  const failedSessions = sessions.filter((r) => r.outcome === "failed");
-  const otherSessions = sessions.filter((r) => r.outcome !== "completed" && r.outcome !== "failed");
+  const failedSessions = sessions.filter((r) => r.outcome === "failed" || r.hardcoreFailed);
+  const otherSessions = sessions.filter((r) => r.outcome !== "completed" && r.outcome !== "failed" && !r.hardcoreFailed);
+  const isCountedFocus = (r) => r.outcome !== "failed" && !r.hardcoreFailed && Math.max(0, Number(r.focusSeconds) || 0) > 0;
+  const countedSessions = sessions.filter(isCountedFocus);
   const focusSeconds = sessions.reduce((sum, r) => sum + Math.max(0, r.focusSeconds || 0), 0);
   const completedFocus = completedSessions.reduce((sum, r) => sum + Math.max(0, r.focusSeconds || 0), 0);
+  const countedFocus = countedSessions.reduce((sum, r) => sum + Math.max(0, r.focusSeconds || 0), 0);
   const breakSeconds = sessions.reduce((sum, r) => sum + Math.max(0, r.breakSeconds || 0), 0);
   const scores = completedSessions.map((r) => scoreFor(r)).filter((s) => s != null);
   const avgScore = scores.length
@@ -119,7 +129,7 @@ export function buildWeekReportForRange(startInput, endInput, {
     byDayMap[localDayKey(cursor)] = 0;
     cursor.setDate(cursor.getDate() + 1);
   }
-  sessions.forEach((r) => {
+  countedSessions.forEach((r) => {
     const k = localDayKey(r.completedAt);
     if (k in byDayMap) byDayMap[k] += Math.max(0, r.focusSeconds || 0);
   });
@@ -128,7 +138,7 @@ export function buildWeekReportForRange(startInput, endInput, {
   const daysActive = byDay.filter((d) => d.focusSeconds > 0).length;
 
   const byTag = {};
-  sessions.forEach((r) => {
+  countedSessions.forEach((r) => {
     const tag = String(r.tag || "").trim() || "Untagged";
     if (!byTag[tag]) byTag[tag] = { sessions: 0, focusSeconds: 0 };
     byTag[tag].sessions += 1;
@@ -151,7 +161,7 @@ export function buildWeekReportForRange(startInput, endInput, {
 
   const weeklyGoalSeconds = Math.max(0, Number(weeklyMinutes) || 0) * 60;
   const goalPct = weeklyGoalSeconds
-    ? Math.round(Math.min(200, (completedFocus / weeklyGoalSeconds) * 100))
+    ? Math.round(Math.min(200, (countedFocus / weeklyGoalSeconds) * 100))
     : null;
 
   const hasActivity = sessions.length > 0 || completedTodos.length > 0;
@@ -174,6 +184,7 @@ export function buildWeekReportForRange(startInput, endInput, {
       other: otherSessions.length,
       focusSeconds,
       completedFocusSeconds: completedFocus,
+      countedFocusSeconds: countedFocus,
       breakSeconds,
       avgScore,
       byDay,
@@ -260,6 +271,10 @@ export function ensureWeekRollover({ notify = true } = {}) {
   }
 
   state.focusGoals.activeWeekKey = calendarKey;
+  const cutoff = Date.parse(state.focusGoals.progressResetAt);
+  if (!Number.isFinite(cutoff) || cutoff < calendarStart.getTime()) {
+    state.focusGoals.progressResetAt = null;
+  }
   persistFocusGoalsMeta();
   return created;
 }
@@ -276,7 +291,7 @@ export function resetWeekNow({ notify = true } = {}) {
     weekStartsOn: state.focusGoals.weekStartsOn,
     weeklyMinutes: state.focusGoals.weeklyMinutes,
     dailyMinutes: state.focusGoals.dailyMinutes,
-    idSuffix: "manual"
+    idSuffix: `manual-${now.getTime()}`
   });
 
   let created = false;
@@ -285,8 +300,10 @@ export function resetWeekNow({ notify = true } = {}) {
     state.openWeekReportId = report.id;
   }
 
-  // Start a new progress window from today so weekly goal % resets immediately.
+  // Start a new progress window at this instant so today's and this week's bars both clear.
+  // History stays; only focus saved after this moment counts toward the goals.
   state.focusGoals.activeWeekKey = localDayKey(now);
+  state.focusGoals.progressResetAt = now.toISOString();
   persistFocusGoalsMeta();
 
   if (notify) {
@@ -327,7 +344,8 @@ export function formatWeekReportText(report) {
     `- Progress: ${perf.weeklyGoalPct == null ? "—" : `${perf.weeklyGoalPct}%`}${perf.metWeeklyGoal ? " (met)" : ""}`,
     "",
     "Sessions",
-    `- Completed focus: ${formatDuration(sessions.completedFocusSeconds || 0)}`,
+    `- Counted focus: ${formatDuration((sessions.countedFocusSeconds ?? sessions.completedFocusSeconds) || 0)}`,
+    `- Completed (70%+): ${formatDuration(sessions.completedFocusSeconds || 0)}`,
     `- All focus logged: ${formatDuration(sessions.focusSeconds || 0)}`,
     `- Sessions: ${sessions.completed || 0} completed / ${sessions.total || 0} total`,
     `- Failed (hardcore): ${sessions.failed || 0}`,
@@ -418,7 +436,7 @@ export function renderWeekReports() {
           <button type="button" class="week-report-summary" data-week-report-toggle="${escapeHtml(report.id)}" aria-expanded="${open}">
             <span class="week-report-summary-main">
               <strong>${escapeHtml(range)}</strong>
-              <span>${formatDuration(report.sessions?.completedFocusSeconds || 0)} focused · ${report.todos?.completedCount || 0} todos</span>
+              <span>${formatDuration((report.sessions?.countedFocusSeconds ?? report.sessions?.completedFocusSeconds) || 0)} focused · ${report.todos?.completedCount || 0} todos</span>
             </span>
             <span class="week-report-summary-meta">
               <span class="week-report-pct ${report.performance?.metWeeklyGoal ? "is-met" : ""}">${escapeHtml(pctLabel)} goal</span>
@@ -454,7 +472,7 @@ function weekReportDetailHtml(report) {
     .slice(0, 6);
   const maxTag = Math.max(1, ...byTag.map(([, info]) => info.focusSeconds || 0));
   const goalPct = perf.weeklyGoalPct;
-  const focusLabel = formatDuration(sessions.completedFocusSeconds || 0);
+  const focusLabel = formatDuration((sessions.countedFocusSeconds ?? sessions.completedFocusSeconds) || 0);
   const goalLabel = goalPct == null ? "No weekly goal set" : `${goalPct}% of weekly goal`;
   const best = perf.bestDay
     ? `Best ${shortDayLabel(perf.bestDay.day)} · ${formatDuration(perf.bestDay.focusSeconds)}`

@@ -39,11 +39,11 @@
     .hero-copy{margin:12px 0 0;color:rgba(242,244,237,.72);font-size:15px;max-width:36rem}
   </style>
   <!-- Full CSS loads async after critical hero styles (mobile LCP). -->
-  <link rel="preload" href="./style.css?v=187" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <link rel="stylesheet" href="./css/screens.css?v=187" media="print" onload="this.media='all'">
+  <link rel="preload" href="./style.css?v=202" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="stylesheet" href="./css/screens.css?v=202" media="print" onload="this.media='all'">
   <noscript>
-    <link rel="stylesheet" href="./style.css?v=187">
-    <link rel="stylesheet" href="./css/screens.css?v=187">
+    <link rel="stylesheet" href="./style.css?v=202">
+    <link rel="stylesheet" href="./css/screens.css?v=202">
   </noscript>
   <script>
     /*! loadCSS rel=preload polyfill-ish */
@@ -211,11 +211,22 @@
           </div>
 
           <div class="field">
-            <label for="duration-preset">How long do you want to focus?</label>
-            <select id="duration-preset" name="durationPreset" class="duration-preset-select">
+            <label id="duration-label" for="duration-preset">How long do you want to focus?</label>
+            <div class="duration-chips" role="group" aria-labelledby="duration-label">
+              <button class="duration-chip" type="button" data-duration="15" aria-pressed="false">15m</button>
+              <button class="duration-chip" type="button" data-duration="25" aria-pressed="false">25m</button>
+              <button class="duration-chip" type="button" data-duration="45" aria-pressed="true">45m</button>
+              <button class="duration-chip" type="button" data-duration="60" aria-pressed="false">1h</button>
+              <button class="duration-chip" type="button" data-duration="120" aria-pressed="false">2h</button>
+              <button class="duration-chip" type="button" data-duration="custom" aria-pressed="false">Custom</button>
+            </div>
+            <select id="duration-preset" name="durationPreset" class="duration-preset-select visually-hidden">
+              <option value="15">15 minutes</option>
+              <option value="25">25 minutes</option>
               <option value="30">30 minutes</option>
               <option value="45" selected>45 minutes</option>
               <option value="60">1 hour</option>
+              <option value="120">2 hours</option>
               <option value="custom">Custom…</option>
             </select>
           </div>
@@ -327,7 +338,7 @@
               </div>
 
               <div class="prefs-group">
-                <p class="prefs-group-label" id="pref-chime-label">Completion chime</p>
+                <p class="prefs-group-label" id="pref-chime-label">Alert sounds</p>
                 <div class="prefs-segment" id="pref-chime" role="radiogroup" aria-labelledby="pref-chime-label">
                   <label class="prefs-segment-option">
                     <input type="radio" name="pref-chime" value="off">
@@ -342,7 +353,7 @@
                     <span>Full</span>
                   </label>
                 </div>
-                <p class="prefs-hint" id="pref-chime-hint">Quiet two-note chime when a session completes.</p>
+                <p class="prefs-hint" id="pref-chime-hint">Quiet chime for session end (including early), break reminders, and suggestions.</p>
               </div>
 
               <button class="button button-secondary button-full setup-open-settings-btn" id="setup-open-settings-btn" type="button">
@@ -386,7 +397,10 @@
             </div>
             <label class="setup-todos-source">
               <span class="setup-todos-source-label">Show</span>
-              <select id="setup-todos-source" aria-label="Choose which tasks to show"></select>
+              <button type="button" class="todo-menu-trigger" id="setup-todos-source" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose which tasks to show">
+                <span class="todo-menu-value">Focus mix</span>
+                <span class="todo-menu-caret" aria-hidden="true"></span>
+              </button>
             </label>
             <div class="setup-todos-preview" id="setup-todos-preview"></div>
             <p class="field-hint" id="setup-todos-hint">Add a few tasks, then start focusing.</p>
@@ -399,7 +413,7 @@
               </div>
               <button type="button" class="setup-heatmap-go" id="setup-heatmap-btn">Insights →</button>
             </div>
-            <p class="local-data-note setup-heatmap-note">Completed focus by day. Click a filled day to open it in History.</p>
+            <p class="local-data-note setup-heatmap-note">Focused time by day, including early-ended sessions. Click a filled day to open it in History.</p>
             <div class="heatmap-frame heatmap-frame-compact" data-heatmap-root>
               <div class="heatmap-months" data-heatmap-months aria-hidden="true"></div>
               <div class="heatmap-main">
@@ -409,7 +423,7 @@
                 <div id="setup-heatmap" class="heatmap" data-heatmap-grid></div>
               </div>
               <div class="heatmap-footer">
-                <span class="heatmap-foot-note">Completed focus only</span>
+                <span class="heatmap-foot-note">All counted focus</span>
                 <div class="heatmap-legend" aria-hidden="true">
                   <span>Less</span>
                   <div class="heatmap-legend-cells">
@@ -446,6 +460,7 @@
         <div class="timer-progress" role="progressbar" id="timer-progress" aria-label="Session progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <span id="timer-progress-bar"></span>
         </div>
+        <p class="timer-next-break is-hidden" id="timer-next-break" aria-live="polite"></p>
         <p class="timer-status-message is-hidden" id="timer-status-message" aria-live="polite"></p>
         <div class="timer-actions">
           <button class="button button-secondary" id="break-btn" type="button">☕ Take a break <kbd>B</kbd></button>
@@ -476,6 +491,10 @@
             <div><span>PLANNED</span><strong id="planned-time">45 min</strong></div>
             <div><span>BREAK</span><strong id="break-time">00:00</strong></div>
             <div><span>ELAPSED</span><strong id="elapsed-time">00:00</strong></div>
+            <div class="timer-completion-meta">
+              <span>DONE</span>
+              <strong id="timer-completion-percent" title="Focused time ÷ planned. Breaks are excluded — same basis as the completion score.">0%</strong>
+            </div>
             <div class="expected-end-meta">
               <span>ENDS</span>
               <strong id="expected-end-time" title="Real end time including breaks taken so far.">—</strong>
@@ -545,10 +564,10 @@
           <strong id="history-attempt-count">0</strong>
           <small>All sessions</small>
         </div>
-        <div class="history-summary-item" title="Only completed sessions">
+        <div class="history-summary-item" title="Focused time from completed and early-ended sessions (Hardcore failures excluded)">
           <span class="metric-label">Focus</span>
           <strong id="history-total-focus">0s</strong>
-          <small>Completed only</small>
+          <small>All counted focus</small>
         </div>
       </div>
       <div class="history-toolbar" role="group" aria-label="Search and filter history">
@@ -704,15 +723,15 @@
       <div class="panel insights-empty-patterns" id="insights-empty-patterns" hidden>
         <p class="eyebrow">PATTERNS</p>
         <h2 id="insights-empty-title">No completed sessions yet</h2>
-        <p id="insights-empty-copy">Charts unlock after a session reaches at least 70% of planned focus time.</p>
+        <p id="insights-empty-copy">Charts unlock after your first focused session — early-ended time counts toward progress.</p>
       </div>
       <div class="insights-analytics-body" id="insights-analytics-body">
         <div class="insights-grid insights-grid-chart">
           <section class="panel insight-panel">
             <div class="panel-heading">
-              <div><p class="eyebrow">LAST 7 DAYS</p><h2>Completed focus</h2></div>
+              <div><p class="eyebrow">LAST 7 DAYS</p><h2>Focus time</h2></div>
             </div>
-            <canvas id="weekly-chart" class="focus-chart" role="img" aria-label="Seven day completed focus chart"></canvas>
+            <canvas id="weekly-chart" class="focus-chart" role="img" aria-label="Seven day focus chart"></canvas>
           </section>
           <section class="panel insight-panel">
             <div class="panel-heading">
@@ -728,7 +747,7 @@
           <section class="panel insight-panel insights-heatmap-panel">
             <div class="panel-heading">
               <div><p class="eyebrow">12 WEEKS</p><h2>Focus heatmap</h2></div>
-              <p class="local-data-note">Completed focus time by day.</p>
+              <p class="local-data-note">Focused time by day, including early-ended sessions.</p>
             </div>
             <div class="heatmap-frame" data-heatmap-root>
               <div class="heatmap-months" data-heatmap-months aria-hidden="true"></div>
@@ -739,7 +758,7 @@
                 <div id="heatmap" class="heatmap" data-heatmap-grid></div>
               </div>
               <div class="heatmap-footer">
-                <span class="heatmap-foot-note">Completed focus only · click a filled day for History</span>
+                <span class="heatmap-foot-note">All counted focus · click a filled day for History</span>
                 <div class="heatmap-legend" aria-hidden="true">
                   <span>Less</span>
                   <div class="heatmap-legend-cells">
@@ -755,11 +774,37 @@
             </div>
             <ul id="heatmap-text" class="visually-hidden"></ul>
           </section>
-          <div class="insights-grid insights-grid-meta">
-            <section class="panel insight-panel"><p class="eyebrow">BEST TIME</p><h2 id="best-time">—</h2><p class="local-data-note">The hour with the most completed focus time.</p></section>
-            <section class="panel insight-panel"><p class="eyebrow">TOP GOAL</p><h2 id="best-goal">—</h2><p class="local-data-note">The goal with the most completed focus time.</p></section>
-            <section class="panel insight-panel"><p class="eyebrow">TOP TAG</p><h2 id="best-tag">—</h2><p class="local-data-note">The tag with the most completed focus time.</p></section>
-          </div>
+          <section class="panel insight-panel insight-side-chart">
+            <div class="panel-heading">
+              <div><p class="eyebrow">BY HOUR</p><h2>When you focus</h2></div>
+              <p class="local-data-note" id="insight-hour-note">Focused time in each hour of the day.</p>
+            </div>
+            <div id="insight-hour-chart" class="insight-hours" role="img" aria-label="Focus by hour of day"></div>
+            <div class="insight-hour-axis" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span></div>
+          </section>
+        </div>
+        <div class="insights-charts" id="insights-charts">
+          <section class="panel insight-panel insight-chart-wide">
+            <div class="panel-heading">
+              <div><p class="eyebrow">BY DAY</p><h2>Hours across the week</h2></div>
+              <p class="local-data-note" id="insight-weekday-note">Total focused time on each weekday.</p>
+            </div>
+            <div id="insight-weekday-chart" class="insight-bars"></div>
+          </section>
+          <section class="panel insight-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">TOPICS</p><h2>Goals</h2></div>
+              <p class="local-data-note">The goals you have given the most time.</p>
+            </div>
+            <div id="insight-goal-chart" class="insight-bars insight-bars-topics"></div>
+          </section>
+          <section class="panel insight-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">TAGS</p><h2>How time splits</h2></div>
+              <p class="local-data-note">Share of focus by tag.</p>
+            </div>
+            <div id="insight-tag-chart" class="insight-donut-wrap"></div>
+          </section>
         </div>
       </div>
     </section>
@@ -1289,7 +1334,7 @@
   </dialog>
   <script type="module">
     // Let first paint / LCP finish before parsing the SPA graph.
-    const boot = () => import("./app.js?v=187");
+    const boot = () => import("./app.js?v=202");
     if ("requestIdleCallback" in window) {
       requestIdleCallback(() => { boot(); }, { timeout: 900 });
     } else {

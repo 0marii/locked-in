@@ -46,7 +46,7 @@ test("no broken root duplicate contract test", () => {
 test("required entry files exist", () => {
   for (const file of [
     "index.html", "app.js", "style.css", "robots.txt", "sitemap.xml",
-    "404.html", "manifest.webmanifest", "sw.js"
+    "404.html", "manifest.webmanifest", "sw.js", ".nojekyll"
   ]) {
     assert.ok(fs.existsSync(path.join(root, file)), `missing ${file}`);
   }

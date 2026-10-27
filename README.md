@@ -20,7 +20,7 @@ A customizable, browser-based focus timer and deep-work tracker. Built with vani
 - Notes and topics are preserved in local history, shown in reports and searchable in session history.
 - Resume an active timer after minimizing, refreshing, or reopening the page.
 - Floating mini-timer when you leave the timer screen for History, Insights, or Notes.
-- Private Insights: completion stats, 7-day chart, 12-week heatmap, streaks, best time, top goal, and top tag.
+- Private Insights: focus time, sessions finished (70% of the plan), average session length, focus days, 7-day chart, 12-week heatmap, streaks, best time, top goal, and top tag (focused minutes from completed and early-ended sessions; Hardcore failures excluded).
 - Daily and weekly completed-focus goals with progress on Setup and Insights.
 - Recent goal chips to refill intent, duration, style, and tag.
 - Optional session tags (Study / Code / Writing / Testing / custom) with History filter.
@@ -43,7 +43,7 @@ A customizable, browser-based focus timer and deep-work tracker. Built with vani
 ```text
 locked-in/
 ├── index.html
-├── style.css              # CSS entry (@import css/*)
+├── style.css              # generated bundle of css/* — commit this
 ├── app.js                 # ES module entry (type="module")
 ├── css/
 │   ├── tokens.css
@@ -105,9 +105,8 @@ Useful pieces:
 npm run css
 npm run assets:verify
 npm run assets:bump
-node --test tests/*.test.cjs
-node --check app.js
-node --check js/*.js
+npm run check:syntax
+npm test
 ```
 
 These are source-level checks, not a substitute for manual browser and Lighthouse testing.
@@ -136,15 +135,23 @@ After any CSS edit, always rebundle before push — `style.css` and `css/screens
 
 ## Deploy to GitHub Pages
 
-This project is designed for a project site hosted at `https://0marii.github.io/locked-in/`.
+The live site is the **repository root** of the publishing branch, served at `https://0marii.github.io/locked-in/`. Pages does not run npm. Whatever is committed at the root is what users get.
+
+Published app files stay where they are now:
+
+- `index.html`, `sw.js`, and `manifest.webmanifest` at the repo root
+- `app.js` plus `js/*.js` as separate modules (imports stay relative, `./js/file.js?v=…`)
+- generated `style.css` and `css/screens.css` committed beside the `css/*` sources
+- icons and images in `assets/` (`favicon.svg`, `icon-192.png`, `icon-512.png`, `icon-512-maskable.png`, and the other logo files the manifest and HTML already point at)
+- `.nojekyll` so Pages copies those files as-is instead of running Jekyll (Jekyll would hide any path that starts with `_`)
+
+Keep every in-app link relative (`./style.css`, `./app.js`, `./assets/favicon.svg`). A root path like `/style.css` 404s, because the site lives under `/locked-in/`, not at the domain root. `manifest` `start_url` and `scope` stay `./`. The service worker stays `./sw.js` next to `index.html` so its scope is the project, not the whole `github.io` host.
 
 1. Follow the **Deploy** checklist above.
 2. In GitHub, open **Settings → Pages**.
-3. Select the correct branch and `/ (root)` folder (or your existing publishing configuration).
+3. Publish the branch from `/ (root)`.
 4. Wait for the Pages deployment to finish.
 5. Open the live URL and smoke-test the mobile menu, timer, history, sticky notes, insights, themes, and exports.
-
-All internal asset links use relative paths (`./style.css`, `./app.js`, `./assets/favicon.svg`) to work under the `/locked-in/` project path.
 
 ## Privacy and storage
 
@@ -158,7 +165,7 @@ Completion score is based on **focused seconds / planned seconds**, not elapsed 
 2. Start from that completion percentage.
 3. Subtract a break-duration penalty and an excess-break-count penalty (more than two breaks).
 
-This is a time-allocation metric, not a scientific measurement of attention, output, or concentration. Incomplete, ended-early, and Hardcore-failed attempts are kept in History but are excluded from Insights completed totals.
+This is a time-allocation metric, not a scientific measurement of attention, output, or concentration. Hardcore-failed attempts are kept in History but are excluded from focus progress, heatmaps, and Insights focus totals. Incomplete and ended-early sessions still add their focused minutes toward daily/weekly goals and charts; they do not count toward the Completed (70%+) tally.
 
 ## Hardcore mode
 

@@ -2,23 +2,23 @@ import {
   ACTIVE_SESSION_KEY, DEFAULT_POMODORO_MINUTES, FOCUS_GOALS_KEY, GOAL_LIMITS, HISTORY_KEY, LEGACY_HISTORY_KEYS,
   MAX_HISTORY, MAX_NOTE_GROUPS, NOTE_GROUPS_KEY, NOTES_INBOX_KEY, POMODORO_CUSTOM_MAX, POMODORO_CUSTOM_MIN,
   POMODORO_MINUTE_OPTIONS, PREFS_KEY, RECENT_GOALS_KEY
-} from "./constants.js?v=187";
-import { dom, state } from "./runtime.js?v=187";
-import { safeRead, safeWrite } from "./storage.js?v=187";
-import { showToast } from "./toast.js?v=187";
+} from "./constants.js?v=202";
+import { dom, state } from "./runtime.js?v=202";
+import { safeRead, safeWrite } from "./storage.js?v=202";
+import { showToast } from "./toast.js?v=202";
 import {
-  clampGoalMinutes, completedRecords, formatClock, formatDuration, formatGoalClock, formatShortDate,
+  clampGoalMinutes, countedFocusRecords, formatClock, formatDuration, formatGoalClock, formatShortDate,
   localDayKey, normalizePomodoroMinutes, normalizeWeekStartsOn, startOfWeek, WEEKDAY_OPTIONS
-} from "./utils.js?v=187";
-import { normalizeRecord } from "./session.js?v=187";
-import { drawHeatmap } from "./insights.js?v=187";
-import { findList, listOpenTasksForSetup, loadTodos, renderSetupTodosWidget } from "./todos.js?v=187";
-import { currentProgressWindow, ensureWeekRollover, loadWeekReports, renderWeekReports } from "./week-reports.js?v=187";
+} from "./utils.js?v=202";
+import { normalizeRecord } from "./session.js?v=202";
+import { drawHeatmap } from "./insights.js?v=202";
+import { findList, listOpenTasksForSetup, loadTodos, renderSetupTodosWidget } from "./todos.js?v=202";
+import { currentProgressWindow, ensureWeekRollover, loadWeekReports, renderWeekReports } from "./week-reports.js?v=202";
 
 export const CHIME_HINTS = {
-  off: "No sound when a session completes.",
-  soft: "Quiet two-note chime when a session completes.",
-  full: "Louder three-note chime so you notice the session ending."
+  off: "No sound for session end, break reminders, or break suggestions.",
+  soft: "Quiet chime for session end (including early), break reminders, and suggestions.",
+  full: "Louder chime for session end, break reminders, and break suggestions."
 };
 
 export function loadData() {
@@ -386,7 +386,8 @@ export function loadFocusGoals() {
     weekStartsOn: normalizeWeekStartsOn(g?.weekStartsOn ?? DEFAULT_FOCUS_GOALS.weekStartsOn),
     activeWeekKey: typeof g?.activeWeekKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(g.activeWeekKey)
       ? g.activeWeekKey
-      : null
+      : null,
+    progressResetAt: Number.isFinite(Date.parse(g?.progressResetAt)) ? new Date(g.progressResetAt).toISOString() : null
   };
 }
 
@@ -413,7 +414,15 @@ export function updateWeekResetChrome(weekStartsOn = state.focusGoals.weekStarts
   const status = dom.goalWeekResetStatus || document.getElementById("goal-week-reset-status");
   if (status) {
     const window = currentProgressWindow();
-    status.textContent = `Current window · since ${formatShortDateSafe(window.startKey)}`;
+    const cutoff = Date.parse(state.focusGoals?.progressResetAt);
+    let since = formatShortDateSafe(window.startKey);
+    if (Number.isFinite(cutoff) && localDayKey(cutoff) === window.startKey) {
+      const when = new Date(cutoff);
+      if (when.getHours() || when.getMinutes() || when.getSeconds()) {
+        since = `${since}, ${when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+      }
+    }
+    status.textContent = `Current window · since ${since}`;
   }
 }
 
@@ -558,7 +567,8 @@ export function draftFocusGoalsFromDom({ commit = false } = {}) {
     dailyMinutes: daily,
     weeklyMinutes: weekly,
     weekStartsOn: syncWeekStartsOnEditor(readWeekStartsOnFromDom()),
-    activeWeekKey: state.focusGoals.activeWeekKey || null
+    activeWeekKey: state.focusGoals.activeWeekKey || null,
+    progressResetAt: state.focusGoals.progressResetAt || null
   };
 }
 
@@ -605,7 +615,8 @@ export function saveFocusGoalsFromDom() {
     dailyMinutes: next.dailyMinutes,
     weeklyMinutes: next.weeklyMinutes,
     weekStartsOn: next.weekStartsOn,
-    activeWeekKey: next.activeWeekKey
+    activeWeekKey: next.activeWeekKey,
+    progressResetAt: next.progressResetAt || null
   })) {
     showToast("Could not save focus goals — browser storage unavailable.");
     return false;
@@ -634,7 +645,8 @@ export function saveFocusGoalsWeekStartsOn() {
     dailyMinutes: next.dailyMinutes,
     weeklyMinutes: next.weeklyMinutes,
     weekStartsOn: next.weekStartsOn,
-    activeWeekKey: next.activeWeekKey
+    activeWeekKey: next.activeWeekKey,
+    progressResetAt: next.progressResetAt || null
   })) {
     showToast("Could not save week start — browser storage unavailable.");
     return false;
@@ -791,6 +803,15 @@ export function renderSetupTodoPick() {
   syncLinkedTodoBar();
 }
 
+export function syncDurationChips() {
+  const value = String(dom.durationPreset?.value || "45");
+  document.querySelectorAll(".duration-chip").forEach((chip) => {
+    const on = chip.dataset.duration === value;
+    chip.classList.toggle("is-selected", on);
+    chip.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
 export function resetSetupFormDefaults() {
   if (dom.taskIntent) dom.taskIntent.value = "";
   clearLinkedTodo();
@@ -805,6 +826,7 @@ export function resetSetupFormDefaults() {
   }
   if (dom.sessionStyle) dom.sessionStyle.value = "standard";
   syncHardcoreHint();
+  syncDurationChips();
   if (dom.goalTagCustom) {
     dom.goalTagCustom.classList.add("is-hidden");
     dom.goalTagCustom.setAttribute("aria-hidden", "true");
@@ -813,7 +835,7 @@ export function resetSetupFormDefaults() {
 }
 
 export function completedFocusInRange(start, end) {
-  return completedRecords().reduce((sum, r) => {
+  return countedFocusRecords().reduce((sum, r) => {
     const t = Date.parse(r.completedAt);
     if (!Number.isFinite(t) || t < start.getTime() || t > end.getTime()) return sum;
     return sum + Math.max(0, r.focusSeconds || 0);
@@ -826,8 +848,9 @@ export function focusProgress() {
   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(todayStart); todayEnd.setHours(23, 59, 59, 999);
   const window = currentProgressWindow(now);
+  const dailyStart = window.start > todayStart ? window.start : todayStart;
   return {
-    dailySeconds: completedFocusInRange(todayStart, todayEnd),
+    dailySeconds: completedFocusInRange(dailyStart, todayEnd),
     weeklySeconds: completedFocusInRange(window.start, window.end),
     dailyGoal: state.focusGoals.dailyMinutes * 60,
     weeklyGoal: state.focusGoals.weeklyMinutes * 60,
@@ -903,7 +926,7 @@ export function applyRecentGoal(goal) {
   if (!goal) return;
   clearLinkedTodo({ refreshPick: true });
   dom.taskIntent.value = goal.intent;
-  const DURATION_PRESETS = ["30", "45", "60"];
+  const DURATION_PRESETS = ["15", "25", "30", "45", "60", "120"];
   if (goal.durationPreset === "custom" && goal.customSeconds >= 60) {
     dom.durationPreset.value = "custom";
     dom.customDuration.classList.remove("is-hidden");
@@ -932,6 +955,7 @@ export function applyRecentGoal(goal) {
   }
   if (dom.sessionStyle) dom.sessionStyle.value = goal.style === "hardcore" ? "hardcore" : "standard";
   syncHardcoreHint();
+  syncDurationChips();
   if (dom.goalTag) {
     const known = ["Study", "Code", "Writing", "Testing"];
     if (!goal.tag) dom.goalTag.value = "";
@@ -962,7 +986,7 @@ export function renderSetup() {
   renderFocusGoals();
   syncHardcoreHint();
   if (state.prefs.showSetupHeatmap !== false) {
-    drawHeatmap(completedRecords(), { setup: true, insights: false });
+    drawHeatmap(countedFocusRecords(), { setup: true, insights: false });
   }
   renderSetupTodosWidget();
   renderSetupTodoPick();

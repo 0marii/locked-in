@@ -1,14 +1,77 @@
-import { MAX_NOTE_GROUPS, NOTE_GROUPS_KEY, NOTES_INBOX_KEY } from "./constants.js?v=187";
-import { dom, state, tabId } from "./runtime.js?v=187";
-import { safeRead, safeWrite } from "./storage.js?v=187";
-import { showToast } from "./toast.js?v=187";
-import { download, formatDate, formatShortDate, localDayKey, noteFilename, setFilterGlow } from "./utils.js?v=187";
-import { broadcast } from "./sync.js?v=187";
-import { askConfirm } from "./theme-nav.js?v=187";
-import { deleteStickyNote, persistSessionNotes, renderStickyNoteList, syncStickyNotesUi } from "./session.js?v=187";
-import { renderHistory, renderReportNotesList, renderSessionNotesViewer, saveHistory, updateEditNotesSummary } from "./history.js?v=187";
+import { MAX_NOTE_GROUPS, NOTE_GROUPS_KEY, NOTES_INBOX_KEY } from "./constants.js?v=202";
+import { dom, state, tabId } from "./runtime.js?v=202";
+import { safeRead, safeWrite } from "./storage.js?v=202";
+import { showToast } from "./toast.js?v=202";
+import { download, formatDate, formatShortDate, localDayKey, noteFilename, setFilterGlow } from "./utils.js?v=202";
+import { broadcast } from "./sync.js?v=202";
+import { askConfirm } from "./theme-nav.js?v=202";
+import { deleteStickyNote, persistSessionNotes, renderStickyNoteList, syncStickyNotesUi } from "./session.js?v=202";
+import { renderHistory, renderReportNotesList, renderSessionNotesViewer, saveHistory, updateEditNotesSummary } from "./history.js?v=202";
 
 const NEW_GROUP_OPTION = "__new__";
+const COLLAPSED_NOTE_GROUPS_KEY = "locked_in_notes_collapsed_v1";
+let collapsedNoteGroups = null;
+
+function collapsedNoteGroupSet() {
+  if (collapsedNoteGroups) return collapsedNoteGroups;
+  const raw = safeRead(COLLAPSED_NOTE_GROUPS_KEY, []);
+  collapsedNoteGroups = new Set(Array.isArray(raw) ? raw.map((id) => String(id)) : []);
+  return collapsedNoteGroups;
+}
+
+function noteGroupKey(kind, id) {
+  return `${kind}:${id || "ungrouped"}`;
+}
+
+function persistCollapsedNoteGroups() {
+  try {
+    localStorage.setItem(COLLAPSED_NOTE_GROUPS_KEY, JSON.stringify([...collapsedNoteGroupSet()]));
+  } catch (_) {}
+}
+
+function forgetCollapsedNoteGroup(key) {
+  if (!collapsedNoteGroupSet().delete(key)) return;
+  persistCollapsedNoteGroups();
+}
+
+function createGroupTitle(name) {
+  const title = document.createElement("h3");
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "notes-group-toggle";
+  const caret = document.createElement("span");
+  caret.className = "notes-group-caret";
+  caret.setAttribute("aria-hidden", "true");
+  const label = document.createElement("span");
+  label.className = "notes-group-name";
+  label.textContent = name;
+  toggle.append(caret, label);
+  title.append(toggle);
+  return title;
+}
+
+function applyGroupCollapse(card, { key, name, body, forceOpen = false } = {}) {
+  const storedClosed = collapsedNoteGroupSet().has(key);
+  const sync = (isOpen) => {
+    card.classList.toggle("is-collapsed", !isOpen);
+    if (body) body.hidden = !isOpen;
+    const toggle = card.querySelector(".notes-group-toggle");
+    if (!toggle) return;
+    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    if (body?.id) toggle.setAttribute("aria-controls", body.id);
+    toggle.setAttribute("aria-label", `${isOpen ? "Collapse" : "Expand"} ${name}`);
+  };
+  sync(forceOpen || !storedClosed);
+  card.querySelector(".session-notes-group-head")?.addEventListener("click", (event) => {
+    if (event.target.closest(".session-notes-group-actions, .note-options")) return;
+    const nextOpen = card.classList.contains("is-collapsed");
+    const set = collapsedNoteGroupSet();
+    if (nextOpen) set.delete(key);
+    else set.add(key);
+    persistCollapsedNoteGroups();
+    sync(nextOpen);
+  });
+}
 
 export function normalizeNoteFields(raw = {}) {
   const title = String(raw?.title || "").trim().slice(0, 120);
@@ -97,6 +160,7 @@ let noteGroupDialogContext = null;
 export function closeNoteGroupDialog({ cancelled = false } = {}) {
   const ctx = noteGroupDialogContext;
   noteGroupDialogContext = null;
+  if (dom.noteGroupName) dom.noteGroupName.maxLength = 48;
   if (dom.noteGroupDialog?.open) dom.noteGroupDialog.close();
   if (cancelled) ctx?.onCancel?.();
 }
@@ -140,6 +204,30 @@ export function submitNoteGroupDialog() {
   if (!name) {
     showToast("Enter a group name.");
     dom.noteGroupName?.focus();
+    return;
+  }
+
+  if (ctx.mode === "rename-session") {
+    const next = name.slice(0, 120);
+    const live = ctx.live && state.session?.id === ctx.sessionId;
+    const record = live ? state.session : state.history.find((item) => item.id === ctx.sessionId);
+    if (!record) {
+      closeNoteGroupDialog();
+      return;
+    }
+    const previous = record.intent;
+    record.intent = next;
+    const saved = live ? persistSessionNotes() : saveHistory();
+    if (!saved) {
+      record.intent = previous;
+      showToast("Could not rename group — browser storage unavailable.");
+      return;
+    }
+    if (live && dom.taskIntent) dom.taskIntent.value = next;
+    closeNoteGroupDialog();
+    renderNotes();
+    if (!live) renderHistory();
+    showToast("Group renamed.");
     return;
   }
 
@@ -191,6 +279,72 @@ export function renameNoteGroup(id) {
   openNoteGroupDialog({ mode: "rename", groupId: id });
 }
 
+function openSessionGroupRename(sessionId, live) {
+  const record = live && state.session?.id === sessionId
+    ? state.session
+    : state.history.find((item) => item.id === sessionId);
+  if (!record || state.readOnly) return;
+  noteGroupDialogContext = { mode: "rename-session", sessionId, live: Boolean(live && state.session?.id === sessionId) };
+  if (dom.noteGroupHeading) dom.noteGroupHeading.textContent = "Rename group";
+  if (dom.noteGroupCopy) dom.noteGroupCopy.textContent = "This updates the goal shown on this group.";
+  if (dom.noteGroupSave) dom.noteGroupSave.textContent = "Save name";
+  if (dom.noteGroupName) {
+    dom.noteGroupName.maxLength = 120;
+    dom.noteGroupName.value = record.intent || "";
+  }
+  if (typeof dom.noteGroupDialog?.showModal === "function") {
+    dom.noteGroupDialog.showModal();
+    requestAnimationFrame(() => {
+      dom.noteGroupName?.focus();
+      dom.noteGroupName?.select?.();
+    });
+  }
+}
+
+function deleteSessionNotesGroup(sessionId, live) {
+  const isLive = live && state.session?.id === sessionId;
+  const record = isLive ? state.session : state.history.find((item) => item.id === sessionId);
+  if (!record || state.readOnly) return;
+  askConfirm(
+    "Delete this group?",
+    isLive
+      ? "Notes in this session will be removed. The timer keeps running."
+      : "Notes in this group will be removed. The focus session stays in History.",
+    () => {
+      if (isLive) {
+        const previous = ensureNoteItems(record).slice();
+        record.noteItems = [];
+        if (!persistSessionNotes()) {
+          record.noteItems = previous;
+          showToast("Could not delete group — browser storage unavailable.");
+          return;
+        }
+        renderStickyNoteList();
+        syncStickyNotesUi();
+      } else {
+        const previous = {
+          noteItems: record.noteItems,
+          notes: record.notes,
+          topic: record.topic
+        };
+        record.noteItems = [];
+        record.notes = "";
+        record.topic = "";
+        if (!saveHistory()) {
+          Object.assign(record, previous);
+          showToast("Could not delete group — browser storage unavailable.");
+          return;
+        }
+        renderHistory();
+      }
+      forgetCollapsedNoteGroup(noteGroupKey("session", sessionId));
+      renderNotes();
+      showToast("Group deleted.");
+    },
+    "Delete group"
+  );
+}
+
 export function deleteNoteGroup(id) {
   const group = findNoteGroup(id);
   if (!group) return;
@@ -212,6 +366,7 @@ export function deleteNoteGroup(id) {
         showToast("Could not delete group — browser storage unavailable.");
         return;
       }
+      forgetCollapsedNoteGroup(noteGroupKey("inbox", id));
       renderNotes();
       showToast("Group deleted.");
     },
@@ -646,17 +801,21 @@ function renderInboxGroupCard({ id, name, items, query }) {
 
   const head = document.createElement("div");
   head.className = "session-notes-group-head";
-  const title = document.createElement("h3");
-  title.textContent = name;
+  const title = createGroupTitle(name);
   const meta = document.createElement("small");
   meta.textContent = `${items.length} note${items.length === 1 ? "" : "s"}`;
   head.append(title, meta);
 
   const groupActions = document.createElement("div");
   groupActions.className = "note-card-actions session-notes-group-actions";
-  const menuItems = [
-    { label: "Add note here", onClick: () => openNoteComposer({ groupId: id || "" }) }
-  ];
+  const menuItems = [];
+  if (id) {
+    menuItems.push(
+      { label: "Rename group", onClick: () => renameNoteGroup(id) },
+      { label: "Delete group", danger: true, onClick: () => deleteNoteGroup(id) }
+    );
+  }
+  menuItems.push({ label: "Add note here", onClick: () => openNoteComposer({ groupId: id || "" }) });
   if (items.length) {
     const allText = items.map((item, i) => `Note ${i + 1}\n${formatNotePlainText(item)}`).join("\n\n");
     menuItems.push(
@@ -664,29 +823,33 @@ function renderInboxGroupCard({ id, name, items, query }) {
       { label: "Download all in this group", onClick: () => downloadNoteText(allText, name || "inbox-group") }
     );
   }
-  if (id) {
-    menuItems.push(
-      { label: "Rename group", onClick: () => renameNoteGroup(id) },
-      { label: "Delete group", danger: true, onClick: () => deleteNoteGroup(id) }
-    );
-  }
-  groupActions.append(createNoteOptionsMenu(menuItems));
+  groupActions.append(createNoteOptionsMenu(menuItems, "Group options"));
   head.append(groupActions);
   card.append(head);
 
+  const body = document.createElement("div");
+  body.className = "notes-group-body";
+  body.id = `notes-group-${noteGroupKey("inbox", id || "ungrouped").replace(/[^a-zA-Z0-9_-]/g, "")}`;
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "empty-inline";
     empty.textContent = query
       ? "No matching notes in this group."
       : "No notes in this group yet.";
-    card.append(empty);
+    body.append(empty);
   } else {
     const list = document.createElement("ul");
     list.className = "session-note-items";
     items.forEach((item, index) => list.append(buildInboxNoteItem(item, index, name)));
-    card.append(list);
+    body.append(list);
   }
+  card.append(body);
+  applyGroupCollapse(card, {
+    key: noteGroupKey("inbox", id || "ungrouped"),
+    name,
+    body,
+    forceOpen: Boolean(query)
+  });
   return card;
 }
 
@@ -803,7 +966,7 @@ function setNotesDateValue(field, iso) {
 export async function openNotesDatePicker(field) {
   const anchor = field === "from" ? dom.notesDateFromBtn : dom.notesDateToBtn;
   if (!anchor) return;
-  const { toggleCustomDatePicker } = await import("./history.js?v=187");
+  const { toggleCustomDatePicker } = await import("./history.js?v=202");
   toggleCustomDatePicker({
     id: `notes-${field}`,
     getValue: () => String((field === "from" ? dom.notesDateFrom : dom.notesDateTo)?.value || ""),
@@ -1062,8 +1225,7 @@ export function renderNotes() {
 
       const head = document.createElement("div");
       head.className = "session-notes-group-head";
-      const title = document.createElement("h3");
-      title.textContent = group.intent;
+      const title = createGroupTitle(group.intent || "Session");
       const meta = document.createElement("small");
       const countLabel = `${group.items.length} note${group.items.length === 1 ? "" : "s"}`;
       meta.textContent = group.live
@@ -1076,26 +1238,34 @@ export function renderNotes() {
         topic.textContent = group.topic;
         head.append(topic);
       }
+      const groupActions = document.createElement("div");
+      groupActions.className = "note-card-actions session-notes-group-actions";
+      const sessionMenu = [
+        { label: "Rename group", onClick: () => openSessionGroupRename(group.sessionId, group.live) },
+        { label: "Delete group", danger: true, onClick: () => deleteSessionNotesGroup(group.sessionId, group.live) }
+      ];
       if (group.items.length) {
-        const groupActions = document.createElement("div");
-        groupActions.className = "note-card-actions session-notes-group-actions";
         const allText = group.items.map((item, i) => {
           const body = formatNotePlainText(item);
           return `Note ${i + 1}\n${body}`;
         }).join("\n\n");
-        groupActions.append(createNoteOptionsMenu([
+        sessionMenu.push(
           { label: "Copy all in this group", onClick: () => copyNoteText(allText) },
           { label: "Download all in this group", onClick: () => downloadNoteText(allText, group.intent || "session-notes") }
-        ]));
-        head.append(groupActions);
+        );
       }
+      groupActions.append(createNoteOptionsMenu(sessionMenu, "Group options"));
+      head.append(groupActions);
       card.append(head);
 
+      const body = document.createElement("div");
+      body.className = "notes-group-body";
+      body.id = `notes-group-${noteGroupKey("session", group.sessionId).replace(/[^a-zA-Z0-9_-]/g, "")}`;
       if (!group.items.length) {
         const empty = document.createElement("p");
         empty.className = "empty-inline";
         empty.textContent = "No notes in this session yet.";
-        card.append(empty);
+        body.append(empty);
       } else {
         const list = document.createElement("ul");
         list.className = "session-note-items";
@@ -1141,8 +1311,15 @@ export function renderNotes() {
           li.append(content, foot, actions);
           list.append(li);
         });
-        card.append(list);
+        body.append(list);
       }
+      card.append(body);
+      applyGroupCollapse(card, {
+        key: noteGroupKey("session", group.sessionId),
+        name: group.intent || "Session",
+        body,
+        forceOpen: Boolean(q) || sessionFilterId === group.sessionId
+      });
       dom.notesSessions.append(card);
     });
   }
@@ -1233,7 +1410,7 @@ export function closeOpenNoteMenus(except = null) {
   });
 }
 
-export function createNoteOptionsMenu(items) {
+export function createNoteOptionsMenu(items, label = "Options") {
   const wrap = document.createElement("div");
   wrap.className = "note-options";
   const toggle = document.createElement("button");
@@ -1241,8 +1418,8 @@ export function createNoteOptionsMenu(items) {
   toggle.className = "note-options-toggle";
   toggle.setAttribute("aria-haspopup", "menu");
   toggle.setAttribute("aria-expanded", "false");
-  toggle.setAttribute("aria-label", "Note options");
-  toggle.title = "Options";
+  toggle.setAttribute("aria-label", label);
+  toggle.title = label;
   toggle.textContent = "⋯";
   const menu = document.createElement("div");
   menu.className = "note-options-menu";

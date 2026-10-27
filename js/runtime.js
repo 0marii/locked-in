@@ -1,5 +1,5 @@
 /** Shared DOM refs and mutable app state. */
-import { DEFAULT_POMODORO_MINUTES } from "./constants.js?v=187";
+import { DEFAULT_POMODORO_MINUTES } from "./constants.js?v=202";
 
 const $ = (id) => document.getElementById(id);
 
@@ -66,7 +66,9 @@ export function bindDom() {
     timerBackBtn: $("timer-back-btn"), statusBadge: $("status-badge"), timerHeading: $("timer-heading"), timerSubtitle: $("timer-subtitle"),
     timeDisplay: $("time-display"), timerProgress: $("timer-progress"), timerProgressBar: $("timer-progress-bar"),
     plannedTime: $("planned-time"), breakTime: $("break-time"), elapsedTime: $("elapsed-time"),
+    timerCompletionPercent: $("timer-completion-percent"),
     expectedEndTime: $("expected-end-time"), expectedEndScheduled: $("expected-end-scheduled"),
+    timerNextBreak: $("timer-next-break"),
     timerStatusMessage: $("timer-status-message"), breakBtn: $("break-btn"), stopBtn: $("stop-btn"), keyboardShortcuts: $("keyboard-shortcuts"),
     stickyNotes: $("sticky-notes"), stickyNotesToggle: $("sticky-notes-toggle"), stickyNotesBody: $("sticky-notes-body"),
     stickyNotesCount: $("sticky-notes-count"), stickyNotesHint: $("sticky-notes-hint"),
@@ -183,7 +185,7 @@ export const state = {
     showSetupTodos: true,
     setupTodosSource: "focus"
   },
-  focusGoals: { dailyMinutes: 120, weeklyMinutes: 600, weekStartsOn: 1, activeWeekKey: null },
+  focusGoals: { dailyMinutes: 120, weeklyMinutes: 600, weekStartsOn: 1, activeWeekKey: null, progressResetAt: null },
   focusGoalsDirty: false,
   weekReports: [],
   openWeekReportId: null,

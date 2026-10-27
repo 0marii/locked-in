@@ -137,7 +137,7 @@
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
-  z-index: 12;
+  z-index: 40;
   display: none;
   min-width: 200px;
   padding: 6px;
@@ -237,6 +237,7 @@
   gap: 4px;
   margin: 0;
   padding: 0 40px 0 0;
+  cursor: pointer;
 }
 
 /* Topic title sits on the rail; nested content is indented beside it */
@@ -262,6 +263,71 @@
   height: 2px;
   border-radius: 1px;
   background: var(--accent);
+}
+
+.session-notes-group-head h3:has(.notes-group-toggle)::before {
+  display: none;
+}
+
+.notes-group-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notes-group-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.notes-group-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.notes-group-caret {
+  width: 7px;
+  height: 7px;
+  margin-top: 0.38em;
+  flex: 0 0 auto;
+  border-right: 1.8px solid var(--accent);
+  border-bottom: 1.8px solid var(--accent);
+  transform: rotate(45deg);
+}
+
+.session-notes-group.is-collapsed .notes-group-caret {
+  margin-top: 0.28em;
+  border-color: var(--text-muted);
+  transform: rotate(-45deg);
+}
+
+.session-notes-group-head:hover .notes-group-caret {
+  border-color: var(--accent);
+}
+
+.session-notes-group.is-collapsed {
+  margin-bottom: 12px;
+}
+
+.session-notes-group.is-collapsed::before {
+  bottom: auto;
+  height: 0.85em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .notes-group-caret {
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
 }
 
 .session-notes-group-head > small,
@@ -292,6 +358,7 @@
   top: -2px;
   right: 0;
   margin: 0;
+  cursor: default;
 }
 
 .session-note-items {

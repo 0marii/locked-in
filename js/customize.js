@@ -1,9 +1,9 @@
 /** Customize pack: colors, fonts, nav SVG icons, export/import. */
-import { CUSTOMIZE_KEY, MAX_SVG_BYTES, MAX_USER_THEMES, THEME_KEY, USER_THEMES_KEY } from "./constants.js?v=187";
-import { dom, state } from "./runtime.js?v=187";
-import { safeRead, safeWrite } from "./storage.js?v=187";
-import { showToast } from "./toast.js?v=187";
-import { download } from "./utils.js?v=187";
+import { CUSTOMIZE_KEY, MAX_SVG_BYTES, MAX_USER_THEMES, THEME_KEY, USER_THEMES_KEY } from "./constants.js?v=202";
+import { dom, state } from "./runtime.js?v=202";
+import { safeRead, safeWrite } from "./storage.js?v=202";
+import { showToast } from "./toast.js?v=202";
+import { download } from "./utils.js?v=202";
 
 export const COLOR_ROLES = ["bg", "surface", "text", "accent", "navBg", "navText"];
 export const NAV_ICON_KEYS = ["setup", "history", "insights", "notes", "todos", "customize", "settings"];

@@ -69,6 +69,37 @@
   font-variant-numeric: tabular-nums;
 }
 
+.duration-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.duration-chip {
+  min-height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 700 13px var(--font);
+  cursor: pointer;
+}
+
+.duration-chip:hover,
+.duration-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--text);
+  outline: none;
+}
+
+.duration-chip.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--text);
+}
+
 .field-hint {
   margin: 0;
   color: var(--text-muted);

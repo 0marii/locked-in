@@ -4,8 +4,8 @@ import {
   POMODORO_CUSTOM_MAX,
   POMODORO_CUSTOM_MIN,
   POMODORO_MINUTE_OPTIONS
-} from "./constants.js?v=187";
-import { state } from "./runtime.js?v=187";
+} from "./constants.js?v=202";
+import { state } from "./runtime.js?v=202";
 
 export function normalizePomodoroMinutes(value) {
   const mins = Math.floor(Number(value) || 0);
@@ -97,6 +97,15 @@ export function localDayKey(value) {
 
 export function completedRecords() {
   return state.history.filter(r => r.outcome === "completed");
+}
+
+/** Focus minutes that count toward goals, heatmaps, and Insights charts.
+ * Includes completed, incomplete, and ended-early sessions; excludes Hardcore failures. */
+export function countedFocusRecords() {
+  return state.history.filter((r) => {
+    if (r.outcome === "failed" || r.hardcoreFailed) return false;
+    return Math.max(0, Number(r.focusSeconds) || 0) > 0;
+  });
 }
 
 export function scoreFor(record) {

@@ -1,11 +1,11 @@
-import { ACTIVE_SESSION_KEY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=187";
-import { dom, state, tabId } from "./runtime.js?v=187";
-import { safeRead, safeWrite } from "./storage.js?v=187";
-import { showToast } from "./toast.js?v=187";
-import { formatShortDate } from "./utils.js?v=187";
-import { initSync } from "./sync.js?v=187";
-import { askConfirm, bindLeaveCustomizeDialog, closeMenu, closeThemePopover, initTheme, navigate, screenMap, toggleMenu } from "./theme-nav.js?v=187";
-import { bindCustomizeEvents, initCustomize } from "./customize.js?v=187";
+import { ACTIVE_SESSION_KEY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=202";
+import { dom, state, tabId } from "./runtime.js?v=202";
+import { safeRead, safeWrite } from "./storage.js?v=202";
+import { showToast } from "./toast.js?v=202";
+import { formatShortDate } from "./utils.js?v=202";
+import { initSync } from "./sync.js?v=202";
+import { askConfirm, bindLeaveCustomizeDialog, closeMenu, closeThemePopover, initTheme, navigate, screenMap, toggleMenu } from "./theme-nav.js?v=202";
+import { bindCustomizeEvents, initCustomize } from "./customize.js?v=202";
 import {
   applyPomodoroMinutesToDom, applyPrefsToDom, clearLinkedTodo, ensureBreakFitsFocus, fitBreakMinutesToFocus,
   linkTodoToSetup, loadData, markFocusGoalsEdited, syncLinkedTodoFromIntentInput,
@@ -13,24 +13,24 @@ import {
   restoreFocusGoalsDefault, saveFocusGoalsFromDom, savePrefs, selectedChimeMode, setPrefsPanelOpen,
   syncBreakFocusValidation, syncChimeHint, syncGoalEditor, syncGoalLimitHint, syncHardcoreHint,
   syncPomodoroCustomVisibility, syncPomodoroIntervalVisibility, syncPomodoroMinuteOptions,
-  syncSetupWidgetVisibility, syncTagCustomVisibility
-} from "./setup.js?v=187";
-import { activeFocusSeconds, addStickyNote, closeEndSessionDialog, finishSession, requestNotificationPermission, requestWakeLock, restoreActiveSession, setStickyNotesOpen, setStickyState, startSession, startTimerLoop, stopSession, tick, toggleBreak } from "./session.js?v=187";
-import { addNoteToViewedSession, addReportNote, clearHistory, clearHistoryFilters, closeSessionNotesViewer, deleteSession, exportCsv, importJson, initDatePickers, initHistoryTableScrollHint, openHistoryForDay, openNotesFilteredToSession, openSessionNotesViewer, renderHistory, saveEdit, saveReportNotes, syncHistoryTableScroll } from "./history.js?v=187";
-import { downloadWeekCard, renderInsights } from "./insights.js?v=187";
+  syncDurationChips, syncSetupWidgetVisibility, syncTagCustomVisibility
+} from "./setup.js?v=202";
+import { activeFocusSeconds, addStickyNote, closeEndSessionDialog, finishSession, initBreakSuggestionSchedule, playChime, requestNotificationPermission, requestWakeLock, rescheduleBreakSuggestionFromFocus, restoreActiveSession, setStickyNotesOpen, setStickyState, startSession, startTimerLoop, stopSession, tick, toggleBreak, unlockAudio } from "./session.js?v=202";
+import { addNoteToViewedSession, addReportNote, clearHistory, clearHistoryFilters, closeSessionNotesViewer, deleteSession, exportCsv, importJson, initDatePickers, initHistoryTableScrollHint, openHistoryForDay, openNotesFilteredToSession, openSessionNotesViewer, renderHistory, saveEdit, saveReportNotes, syncHistoryTableScroll } from "./history.js?v=202";
+import { downloadWeekCard, renderInsights } from "./insights.js?v=202";
 import {
   clearNotesFilters, clearNotesSessionFilter, closeNoteGroupDialog, closeOpenNoteMenus, createNoteOptionsMenu,
   deleteEditedNote, onNoteGroupSelectChange, onNotesScopeFilterChange, onNotesSessionPickChange, openNoteComposer,
   openNotesDatePicker, promptNewNoteGroup, renderNotes, saveEditedNote, submitNoteGroupDialog
-} from "./notes.js?v=187";
-import { bindTodoEvents, renderTodos } from "./todos.js?v=187";
-import { bindWeekReportEvents, renderWeekReports, resetWeekNow } from "./week-reports.js?v=187";
-import { bindSettingsEvents, syncSettingsNotifyStatus } from "./settings.js?v=187";
+} from "./notes.js?v=202";
+import { bindTodoEvents, renderTodos } from "./todos.js?v=202";
+import { bindWeekReportEvents, renderWeekReports, resetWeekNow } from "./week-reports.js?v=202";
+import { bindSettingsEvents, syncSettingsNotifyStatus } from "./settings.js?v=202";
 
 function confirmResetWeekNow() {
   askConfirm(
     "Reset this week now?",
-    "Weekly progress starts fresh and a performance report is saved. Session history and todos are not deleted.",
+    "Today's progress and this week's progress both start over. A performance report is saved. Session history and todos stay.",
     () => {
       resetWeekNow({ notify: true });
       renderFocusGoals();
@@ -95,8 +95,15 @@ export function bindEvents() {
     const custom=dom.durationPreset.value==="custom";
     dom.customDuration.classList.toggle("is-hidden",!custom);
     dom.customDuration.setAttribute("aria-hidden",String(!custom));
+    syncDurationChips();
     if(custom)dom.customHours.focus();
     refreshBreakOptionsForFocus();
+  });
+  document.querySelector(".duration-chips")?.addEventListener("click", (event) => {
+    const chip = event.target.closest(".duration-chip");
+    if (!chip || !dom.durationPreset) return;
+    dom.durationPreset.value = chip.dataset.duration || "45";
+    dom.durationPreset.dispatchEvent(new Event("change", { bubbles: true }));
   });
   [dom.customHours, dom.customMinutes].filter(Boolean).forEach((el) => {
     el.addEventListener("input", refreshBreakOptionsForFocus);
@@ -200,7 +207,7 @@ export function bindEvents() {
     state.prefs[key] = true;
     syncNotifyCheckbox(key, true);
     if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
-    import("./settings.js?v=187").then(({ syncSettingsNotifyStatus }) => syncSettingsNotifyStatus()).catch(() => {});
+    import("./settings.js?v=202").then(({ syncSettingsNotifyStatus }) => syncSettingsNotifyStatus()).catch(() => {});
   };
   dom.prefsToggleBtn?.addEventListener("click", () => {
     setPrefsPanelOpen(!state.prefs.panelOpen);
@@ -226,6 +233,14 @@ export function bindEvents() {
         dom.prefPomodoroMinutes.focus();
       }
     }
+    if (state.session) {
+      if (!state.prefs.pomodoro) state.session.nextBreakSuggestionAt = null;
+      else if (!state.session.currentBreakStartedAt) {
+        rescheduleBreakSuggestionFromFocus(state.session, activeFocusSeconds(state.session));
+      } else {
+        initBreakSuggestionSchedule(state.session);
+      }
+    }
     if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
   });
   dom.prefPomodoroMinutes?.addEventListener("change", () => {
@@ -248,6 +263,11 @@ export function bindEvents() {
     state.prefs.pomodoroMinutes = readPomodoroMinutesFromDom();
     applyPomodoroMinutesToDom(state.prefs.pomodoroMinutes);
     state.pomodoroNotifiedBucket = -1;
+    if (state.session && !state.session.currentBreakStartedAt) {
+      rescheduleBreakSuggestionFromFocus(state.session, activeFocusSeconds(state.session));
+    } else if (state.session) {
+      initBreakSuggestionSchedule(state.session);
+    }
     if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
   });
   const commitPomodoroCustom = () => {
@@ -262,6 +282,11 @@ export function bindEvents() {
     state.prefs.pomodoroMinutes = typed;
     applyPomodoroMinutesToDom(state.prefs.pomodoroMinutes);
     state.pomodoroNotifiedBucket = -1;
+    if (state.session && !state.session.currentBreakStartedAt) {
+      rescheduleBreakSuggestionFromFocus(state.session, activeFocusSeconds(state.session));
+    } else if (state.session) {
+      initBreakSuggestionSchedule(state.session);
+    }
     if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
   };
   dom.prefPomodoroCustomMinutes?.addEventListener("input", syncBreakFocusValidation);
@@ -287,7 +312,17 @@ export function bindEvents() {
       state.prefs.chime = selectedChimeMode();
       syncChimeHint();
       if (!savePrefs()) showToast("Could not save preferences — browser storage unavailable.");
+      // Preview unlocks AudioContext under this click so later timer sounds can play.
+      if (state.prefs.chime !== "off") playChime();
+      else void unlockAudio();
     });
+  });
+  // Warm audio on gestures / tab focus so timer cues are less likely to be blocked.
+  const warmAudio = () => { void unlockAudio(); };
+  document.addEventListener("pointerdown", warmAudio, true);
+  document.addEventListener("keydown", warmAudio, true);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && state.session) warmAudio();
   });
   dom.setupEditGoalsBtn?.addEventListener("click", () => {
     navigate("insights-screen");
@@ -462,7 +497,7 @@ export function bindEvents() {
 }
 
 export function init() {
-  loadData();initTheme();initCustomize();applyPrefsToDom();syncSettingsNotifyStatus();syncTagCustomVisibility();bindEvents();bindCustomizeEvents();bindLeaveCustomizeDialog();bindSettingsEvents();bindTodoEvents();initSync();
+  loadData();initTheme();initCustomize();applyPrefsToDom();syncSettingsNotifyStatus();syncTagCustomVisibility();syncDurationChips();bindEvents();bindCustomizeEvents();bindLeaveCustomizeDialog();bindSettingsEvents();bindTodoEvents();initSync();
   try{dom.keyboardShortcuts.checked=localStorage.getItem("locked_in_keyboard_shortcuts")!=="false";}catch(_){}
   dom.keyboardShortcuts.addEventListener("change",()=>{try{localStorage.setItem("locked_in_keyboard_shortcuts",String(dom.keyboardShortcuts.checked));}catch(_){}});
   dom.currentYear.textContent=new Date().getFullYear();

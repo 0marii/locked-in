@@ -7,8 +7,8 @@
     "css": "node scripts/bundle-css.cjs",
     "assets:bump": "node scripts/bump-assets.cjs",
     "assets:verify": "node scripts/verify-assets.cjs",
-    "check:syntax": "node --check app.js && node --check js/*.js",
-    "test": "npm run css && npm run assets:verify && node --test tests/*.test.cjs",
+    "check:syntax": "node scripts/check-syntax.cjs",
+    "test": "npm run css && npm run assets:verify && node scripts/run-tests.cjs",
     "check": "npm run check:syntax && npm test",
     "predeploy": "npm run check"
   },

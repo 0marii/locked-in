@@ -1,18 +1,18 @@
-import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=187";
-import { dom, state, tabId } from "./runtime.js?v=187";
-import { safeRead, safeWrite } from "./storage.js?v=187";
-import { showToast } from "./toast.js?v=187";
-import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=187";
-import { broadcast } from "./sync.js?v=187";
-import { navigate } from "./theme-nav.js?v=187";
+import { ACTIVE_SESSION_KEY, BREAK_REMINDER_MS, HARDCORE_BREAK_LIMIT_SECONDS, MAX_HISTORY, MIN_SAVED_FOCUS_SECONDS } from "./constants.js?v=202";
+import { dom, state, tabId } from "./runtime.js?v=202";
+import { safeRead, safeWrite } from "./storage.js?v=202";
+import { showToast } from "./toast.js?v=202";
+import { formatClock, formatDate, formatDuration, normalizePomodoroMinutes, scoreFor } from "./utils.js?v=202";
+import { broadcast } from "./sync.js?v=202";
+import { navigate } from "./theme-nav.js?v=202";
 import {
   breakIntervalFitsFocus, currentTagValue, pomodoroIntervalSeconds, readPomodoroMinutesFromDom,
   rememberRecentGoal, renderRecentGoals, resetSetupFormDefaults,
   syncBreakFocusValidation, syncPomodoroIntervalVisibility, syncPomodoroMinuteOptions
-} from "./setup.js?v=187";
-import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=187";
-import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, formatNotePlainText, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=187";
-import { pauseTaskTimer, startTaskTimer } from "./todos.js?v=187";
+} from "./setup.js?v=202";
+import { renderReportNotesList, saveHistory, syncLiveHistoryRow } from "./history.js?v=202";
+import { composeNotesText, createNoteItemOptions, deleteEditedNote, ensureNoteItems, formatNotePlainText, openNoteEditor, refreshNotesSurfaces } from "./notes.js?v=202";
+import { pauseTaskTimer, startTaskTimer } from "./todos.js?v=202";
 
 export function normalizeRecord(record) {
   if (!record || typeof record !== "object") return null;
@@ -72,11 +72,168 @@ export function persistSessionNotes() {
   return true;
 }
 
-export function notify(title, body) {
+export function notify(title, body, { sound = false } = {}) {
+  if (sound) playAlertCue();
   if (!("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
   try {
-      new Notification(title, { body, icon: "./assets/icon-192.png", badge: "./assets/icon-192.png", silent: false });
+    new Notification(title, {
+      body,
+      icon: "./assets/icon-192.png",
+      badge: "./assets/icon-192.png",
+      silent: false,
+      tag: "locked-in-alert",
+      renotify: true
+    });
+  } catch (_) {}
+}
+
+/** Shared AudioContext — browsers suspend new contexts without a recent gesture. */
+let sharedAudioCtx = null;
+let lastAudioKeepAliveAt = 0;
+let htmlBeepUrl = null;
+
+export async function unlockAudio() {
+  const ctx = await ensureAudioContext();
+  return Boolean(ctx && ctx.state === "running");
+}
+
+async function ensureAudioContext() {
+  const C = window.AudioContext || window.webkitAudioContext;
+  if (!C) return null;
+  try {
+    if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+      sharedAudioCtx = new C();
+    }
+    if (sharedAudioCtx.state === "suspended") {
+      await sharedAudioCtx.resume();
+    }
+    return sharedAudioCtx;
+  } catch (_) {
+    return null;
+  }
+}
+
+function scheduleTone(ctx, frequency, startAt, { peak = 0.08, hold = 0.18, type = "sine" } = {}) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = frequency;
+  gain.gain.setValueAtTime(0.0001, startAt);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.001, peak), startAt + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + hold);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(startAt);
+  osc.stop(startAt + hold + 0.02);
+}
+
+async function playToneSequence(freqs, { peak, gap, hold, type = "sine" } = {}) {
+  const ctx = await ensureAudioContext();
+  if (ctx && ctx.state === "running") {
+    const now = ctx.currentTime;
+    freqs.forEach((f, i) => {
+      scheduleTone(ctx, f, now + i * gap, { peak, hold, type });
+    });
+    return true;
+  }
+  // Timer callbacks often cannot resume AudioContext — fall back to HTMLAudioElement.
+  return playHtmlBeepFallback(peak);
+}
+
+function buildBeepDataUri() {
+  const sampleRate = 22050;
+  const durationSec = 0.22;
+  const samples = Math.floor(sampleRate * durationSec);
+  const bytes = new Uint8Array(44 + samples * 2);
+  const view = new DataView(bytes.buffer);
+  const writeStr = (offset, str) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + samples * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, samples * 2, true);
+  for (let i = 0; i < samples; i++) {
+    const t = i / sampleRate;
+    const env = Math.min(1, t * 18) * Math.max(0, 1 - (t / durationSec));
+    // Two short chirps in one buffer so the fallback is still noticeable.
+    const f = t < 0.11 ? 523.25 : 659.25;
+    const sample = Math.max(-1, Math.min(1, Math.sin(2 * Math.PI * f * t) * env * 0.55));
+    view.setInt16(44 + i * 2, sample * 0x7fff, true);
+  }
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return `data:audio/wav;base64,${btoa(binary)}`;
+}
+
+function playHtmlBeepFallback(peak = 0.12) {
+  try {
+    if (!htmlBeepUrl) htmlBeepUrl = buildBeepDataUri();
+    const audio = new Audio(htmlBeepUrl);
+    audio.volume = Math.max(0.2, Math.min(1, peak * 4));
+    const play = audio.play();
+    if (play && typeof play.catch === "function") play.catch(() => {});
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Keep the shared AudioContext from going cold during a long focus (so cues can play later). */
+function keepAudioAlive(now = Date.now()) {
+  if (!state.session) return;
+  if (now - lastAudioKeepAliveAt < 15000) return;
+  lastAudioKeepAliveAt = now;
+  void (async () => {
+    const ctx = await ensureAudioContext();
+    if (!ctx || ctx.state !== "running") return;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.00001;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const t = ctx.currentTime;
+      osc.start(t);
+      osc.stop(t + 0.02);
+    } catch (_) {}
+  })();
+}
+
+/** Soft cue for break reminders / suggestions (respects chime Off). */
+export function playAlertCue() {
+  const mode = state.prefs.chime || "soft";
+  if (mode === "off") return;
+  void playToneSequence([392, 523.25, 659.25], {
+    peak: mode === "full" ? 0.16 : 0.11,
+    gap: 0.13,
+    hold: 0.2
+  });
+}
+
+/** Louder dedicated cue when a suggested-break interval is reached. */
+export function playBreakSuggestionCue() {
+  const mode = state.prefs.chime || "soft";
+  if (mode === "off") return;
+  void playToneSequence([523.25, 659.25, 783.99], {
+    peak: mode === "full" ? 0.18 : 0.13,
+    gap: 0.12,
+    hold: 0.22
+  });
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate([80, 40, 80]);
+    }
   } catch (_) {}
 }
 
@@ -115,8 +272,49 @@ export function scheduleBreakReminder() {
   state.breakReminderTimer = setTimeout(() => {
     state.breakReminderTimer = null;
     if (!state.session?.currentBreakStartedAt) return;
-    notify("Still on break", "You’ve been on break for 5 minutes. Resume when you’re ready.");
+    notify("Still on break", "You’ve been on break for 5 minutes. Resume when you’re ready.", { sound: true });
   }, BREAK_REMINDER_MS);
+}
+
+/** Next suggestion fires when focused seconds reach this value. null = cancelled for this session. */
+function breakSuggestionFits(session, focusThresholdSec) {
+  if (!session || !Number.isFinite(focusThresholdSec)) return false;
+  return focusThresholdSec > 0 && focusThresholdSec < session.targetSeconds;
+}
+
+export function initBreakSuggestionSchedule(session) {
+  if (!session) return;
+  if (!state.prefs.pomodoro) {
+    session.nextBreakSuggestionAt = null;
+    return;
+  }
+  const intervalSec = pomodoroIntervalSeconds();
+  session.nextBreakSuggestionAt = breakSuggestionFits(session, intervalSec) ? intervalSec : null;
+}
+
+/**
+ * After a break resume (or after a suggestion fires): schedule one full interval from
+ * current focus. If that would land at/after session end, cancel further suggestions.
+ */
+export function rescheduleBreakSuggestionFromFocus(session, focusSeconds) {
+  if (!session) return { scheduled: false, cancelled: false };
+  if (!state.prefs.pomodoro) {
+    session.nextBreakSuggestionAt = null;
+    return { scheduled: false, cancelled: false };
+  }
+  const intervalSec = pomodoroIntervalSeconds();
+  if (!intervalSec || intervalSec <= 0) {
+    session.nextBreakSuggestionAt = null;
+    return { scheduled: false, cancelled: true };
+  }
+  const focus = Math.max(0, Number(focusSeconds) || 0);
+  const nextAt = focus + intervalSec;
+  if (!breakSuggestionFits(session, nextAt)) {
+    session.nextBreakSuggestionAt = null;
+    return { scheduled: false, cancelled: true };
+  }
+  session.nextBreakSuggestionAt = nextAt;
+  return { scheduled: true, cancelled: false };
 }
 
 export function parseDuration() {
@@ -181,7 +379,7 @@ export function startSession(event) {
           ? `Custom break time (${breakMin}m) must be under focus time (${focusMin}m).`
           : `Break reminder (${breakMin}m) must be under focus time (${focusMin}m).`
       );
-      import("./settings.js?v=187").then(({ openSettingsForBreaks }) => openSettingsForBreaks());
+      import("./settings.js?v=202").then(({ openSettingsForBreaks }) => openSettingsForBreaks());
       return;
     }
     state.prefs.pomodoro = true;
@@ -194,8 +392,10 @@ export function startSession(event) {
     targetSeconds, hardcore: dom.sessionStyle.value === "hardcore", startedAt: now,
     activeWorkStartedAt: now, accumulatedFocusSeconds: 0, currentBreakStartedAt: null,
     breakSeconds: 0, breaks: [], topic: "", notes: "", noteItems: [], tag,
-    todoTaskId: linkedTodoId
+    todoTaskId: linkedTodoId,
+    nextBreakSuggestionAt: null
   };
+  initBreakSuggestionSchedule(state.session);
   if (!safeWrite(ACTIVE_SESSION_KEY, state.session)) { state.session = null; return; }
   if (linkedTodoId) startTaskTimer(linkedTodoId, { render: false });
   rememberRecentGoal({
@@ -216,6 +416,7 @@ export function startSession(event) {
   resetStickyNotes();
   renderRecentGoals();
   navigate("timer-screen");
+  void unlockAudio();
   requestWakeLock();
   startTimerLoop();
   renderTimer(now);
@@ -400,6 +601,7 @@ export function tick() {
   const s = state.session;
   if (!s) return;
   const now = Date.now();
+  keepAudioAlive(now);
   const breakTotal = currentBreakSeconds(s, now);
   if (s.hardcore && breakTotal >= HARDCORE_BREAK_LIMIT_SECONDS) {
     finishSession("failed", "Hardcore break limit reached.", false);
@@ -409,15 +611,20 @@ export function tick() {
     s.remainingSeconds = Math.max(0, s.targetSeconds - activeFocusSeconds(s, now));
     if (s.remainingSeconds <= 0) { finishSession("completed", "Target duration reached.", false); return; }
     if (state.prefs.pomodoro) {
-      const intervalSec = pomodoroIntervalSeconds();
-      const intervalMin = normalizePomodoroMinutes(state.prefs.pomodoroMinutes);
       const focus = activeFocusSeconds(s, now);
-      const bucket = Math.floor(focus / intervalSec);
-      if (bucket > 0 && bucket > state.pomodoroNotifiedBucket) {
-        state.pomodoroNotifiedBucket = bucket;
-        const focusedMin = bucket * intervalMin;
-        showToast(`You’ve focused ${focusedMin} minutes — consider a short break.`);
+      // Migrate older in-progress sessions that lack the new schedule field.
+      if (!("nextBreakSuggestionAt" in s)) initBreakSuggestionSchedule(s);
+      const nextAt = s.nextBreakSuggestionAt;
+      if (nextAt != null && focus >= nextAt) {
+        const focusedMin = Math.max(1, Math.round(focus / 60));
+        // Sound first (does not depend on notification permission), then toast + OS notify.
+        playBreakSuggestionCue();
+        showToast(`Break suggestion · ${focusedMin}m focused — take a short break?`);
         notify("Break suggestion", `You’ve focused ${focusedMin} minutes. A short break can help.`);
+        // Queue the next full interval from this mark; cancel if it won't fit before session end.
+        const intervalSec = pomodoroIntervalSeconds();
+        const following = nextAt + intervalSec;
+        s.nextBreakSuggestionAt = breakSuggestionFits(s, following) ? following : null;
       }
     }
   }
@@ -431,6 +638,7 @@ export function tick() {
 export function toggleBreak() {
   const s = state.session;
   if (!s || state.readOnly) return;
+  void unlockAudio();
   const now = Date.now();
   if (!s.currentBreakStartedAt) {
     s.accumulatedFocusSeconds += Math.max(0, (now - s.activeWorkStartedAt) / 1000);
@@ -444,7 +652,17 @@ export function toggleBreak() {
     s.breaks.push({startedAt:new Date(s.currentBreakStartedAt).toISOString(), endedAt:new Date(now).toISOString(), durationSeconds:Math.floor(duration)});
     s.currentBreakStartedAt = null; s.activeWorkStartedAt = now;
     if (s.hardcore && s.breakSeconds >= HARDCORE_BREAK_LIMIT_SECONDS) { finishSession("failed", "Hardcore break limit reached.", false); return; }
-    showToast("Break ended. Focus resumed.");
+    // Reset suggestion to one full interval from resume; cancel if not enough session time left.
+    const focusNow = activeFocusSeconds(s, now);
+    const result = rescheduleBreakSuggestionFromFocus(s, focusNow);
+    if (state.prefs.pomodoro && result.cancelled) {
+      showToast("Focus resumed · not enough time left for another break suggestion.");
+    } else if (state.prefs.pomodoro && result.scheduled) {
+      const mins = normalizePomodoroMinutes(state.prefs.pomodoroMinutes);
+      showToast(`Focus resumed · next break suggestion in ${mins}m of focus.`);
+    } else {
+      showToast("Break ended. Focus resumed.");
+    }
   }
   safeWrite(ACTIVE_SESSION_KEY, s); state.lastPersistedAt = now; renderTimer(now);
 }
@@ -482,6 +700,115 @@ export function syncFloatingTimer(now = Date.now()) {
   );
 }
 
+function syncNextBreakHint(session, focusSeconds, onBreak) {
+  const el = dom.timerNextBreak;
+  if (!el) return;
+  if (!state.prefs.pomodoro) {
+    el.hidden = true;
+    el.classList.add("is-hidden");
+    el.textContent = "";
+    el.removeAttribute("title");
+    return;
+  }
+  const intervalSec = pomodoroIntervalSeconds();
+  const intervalMin = normalizePomodoroMinutes(state.prefs.pomodoroMinutes);
+  el.hidden = false;
+  el.classList.remove("is-hidden");
+  el.title = `After you resume from a break, the next suggestion resets to a full ${intervalMin}m of focus. If that would pass the session end, suggestions are cancelled.`;
+  if (onBreak) {
+    const focusAtResume = focusSeconds; // focus already excludes the open break
+    const wouldBe = focusAtResume + intervalSec;
+    if (!breakSuggestionFits(session, wouldBe)) {
+      el.textContent = `On break · resume will cancel further break suggestions (not enough time left)`;
+    } else {
+      el.textContent = `On break · resume resets next suggestion to ${intervalMin}m of focus`;
+    }
+    return;
+  }
+  if (!intervalSec || intervalSec <= 0) {
+    el.textContent = "";
+    el.hidden = true;
+    el.classList.add("is-hidden");
+    return;
+  }
+  if (!("nextBreakSuggestionAt" in session)) initBreakSuggestionSchedule(session);
+  const nextAt = session.nextBreakSuggestionAt;
+  if (nextAt == null) {
+    el.textContent = `Break every ${intervalMin}m · no more suggestions this session`;
+    return;
+  }
+  const remain = Math.max(0, Math.ceil(nextAt - focusSeconds));
+  el.textContent = `Next break suggestion in ${formatClock(remain)}`;
+}
+
+let liveFavicon = null;
+let lastTimerChromeKey = "";
+
+function faviconClockLabel(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, "0")}`;
+  return `${minutes}:${String(secs).padStart(2, "0")}`;
+}
+
+function ensureLiveFavicon() {
+  if (liveFavicon) return liveFavicon;
+  const link = document.createElement("link");
+  link.id = "live-timer-icon";
+  link.rel = "icon";
+  link.type = "image/png";
+  document.head.append(link);
+  liveFavicon = link;
+  return link;
+}
+
+/** Tab icon + Windows taskbar badge while a session is running. */
+export function syncTimerChrome({ seconds = 0, onBreak = false, progress = 0 } = {}) {
+  const label = faviconClockLabel(seconds);
+  const key = `${onBreak ? "b" : "f"}:${label}:${Math.round(progress * 20)}`;
+  if (key !== lastTimerChromeKey) {
+    lastTimerChromeKey = key;
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, 64, 64);
+      ctx.beginPath();
+      ctx.arc(32, 32, 30, 0, Math.PI * 2);
+      ctx.fillStyle = "#101310";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(32, 32, 26, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, Math.max(0, progress)));
+      ctx.strokeStyle = onBreak ? "#f2c66d" : "#b7f36b";
+      ctx.lineWidth = 6;
+      ctx.lineCap = "round";
+      ctx.stroke();
+      ctx.fillStyle = "#f4f6ee";
+      ctx.font = "700 15px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, 32, 33);
+      ensureLiveFavicon().href = canvas.toDataURL("image/png");
+    }
+  }
+  const minutes = Math.max(1, Math.ceil(Math.max(0, seconds) / 60));
+  if (typeof navigator.setAppBadge === "function") {
+    navigator.setAppBadge(minutes).catch(() => {});
+  }
+}
+
+export function clearTimerChrome() {
+  lastTimerChromeKey = "";
+  liveFavicon?.remove();
+  liveFavicon = null;
+  if (typeof navigator.clearAppBadge === "function") {
+    navigator.clearAppBadge().catch(() => {});
+  }
+}
+
 export function renderTimer(now = Date.now()) {
   const s = state.session; if (!s) return;
   const onBreak = Boolean(s.currentBreakStartedAt);
@@ -500,6 +827,7 @@ export function renderTimer(now = Date.now()) {
   } else {
     dom.timerSubtitle.textContent = s.hardcore ? "Hardcore · 15m total break limit" : "Stay with one thing.";
   }
+  syncNextBreakHint(s, focus, onBreak);
   dom.timeDisplay.textContent = faceClock;
   if (dom.timeDisplay) {
     dom.timeDisplay.setAttribute("aria-label", onBreak ? "Break time elapsed" : "Time remaining");
@@ -510,6 +838,13 @@ export function renderTimer(now = Date.now()) {
   dom.plannedTime.textContent = formatDuration(s.targetSeconds);
   dom.breakTime.textContent = formatDuration(breaks);
   dom.elapsedTime.textContent = formatDuration(elapsed);
+  const completionPct = s.targetSeconds
+    ? Math.min(100, Math.round((focus / s.targetSeconds) * 100))
+    : 0;
+  if (dom.timerCompletionPercent) {
+    dom.timerCompletionPercent.textContent = `${completionPct}%`;
+    dom.timerCompletionPercent.title = `Focused ${formatDuration(focus)} of ${formatDuration(s.targetSeconds)} planned (${completionPct}%). Breaks are excluded — same basis as the completion score.`;
+  }
   const timeOpts = { hour: "2-digit", minute: "2-digit" };
   const scheduledEnd = new Date(s.startedAt + s.targetSeconds * 1000);
   const realEnd = new Date(s.startedAt + (s.targetSeconds + breaks) * 1000);
@@ -538,12 +873,14 @@ export function renderTimer(now = Date.now()) {
   dom.timerProgressBar.style.width = `${pct}%`;
   dom.timerProgress.setAttribute("aria-valuenow", String(Math.round(pct)));
   document.title = onBreak ? `Break ${faceClock} · Locked-In` : `${faceClock} · Locked-In`;
+  syncTimerChrome({ seconds: faceSeconds, onBreak, progress: onBreak ? 1 : focus / Math.max(1, s.targetSeconds) });
   syncFloatingTimer(now);
 }
 
 export function stopSession() {
   if (!state.session) return;
   if (dom.endSessionDialog?.open) return;
+  void unlockAudio();
   openEndSessionDialog();
 }
 
@@ -583,6 +920,7 @@ function pauseLinkedTodoFromSession(session) {
 
 export function finishSession(outcome, reason, discard) {
   const s = state.session; if (!s) return;
+  void unlockAudio();
   const now = Date.now();
   if (s.currentBreakStartedAt) {
     const duration = Math.max(0, (now - s.currentBreakStartedAt) / 1000);
@@ -599,6 +937,7 @@ export function finishSession(outcome, reason, discard) {
     clearBreakReminder();
     stopTimerLoop(); releaseWakeLock(); state.session = null; safeWrite(ACTIVE_SESSION_KEY, null); broadcast({type:"active-session", source:tabId, sessionId:null});
     resetStickyNotes();
+    clearTimerChrome();
     syncFloatingTimer();
     showToast(focusSeconds < MIN_SAVED_FOCUS_SECONDS
       ? "Short session discarded. Nothing was added to history."
@@ -628,6 +967,7 @@ export function finishSession(outcome, reason, discard) {
   clearBreakReminder();
   stopTimerLoop(); releaseWakeLock(); state.session = null; safeWrite(ACTIVE_SESSION_KEY, null); broadcast({type:"active-session", source:tabId, sessionId:null});
   resetStickyNotes();
+  clearTimerChrome();
   syncFloatingTimer();
   state.history.unshift(record); state.history = state.history.slice(0, MAX_HISTORY);
   if (!saveHistory()) {
@@ -635,7 +975,8 @@ export function finishSession(outcome, reason, discard) {
   }
   state.reportId = record.id;
   renderReport(record); navigate("report-screen");
-  if (record.outcome === "completed") playChime();
+  // Chime for every saved ending (complete, early, incomplete, hardcore fail) unless Off.
+  playChime();
   if (state.prefs.notifyEnd) {
     const label = record.outcome === "completed" ? "Session complete"
       : record.outcome === "failed" ? "Hardcore session failed"
@@ -648,24 +989,11 @@ export function finishSession(outcome, reason, discard) {
 export function playChime() {
   const mode = state.prefs.chime || "soft";
   if (mode === "off") return;
-  try {
-    const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
-    const ctx = new C(), now = ctx.currentTime;
-    const notes = mode === "full" ? [523.25, 659.25, 783.99] : [523.25, 659.25];
-    const peak = mode === "full" ? .12 : .05;
-    const gap = mode === "full" ? .12 : .1;
-    const hold = mode === "full" ? .25 : .16;
-    notes.forEach((f, i) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = "sine"; o.frequency.value = f;
-      g.gain.setValueAtTime(.0001, now + i * gap);
-      g.gain.exponentialRampToValueAtTime(peak, now + i * gap + .03);
-      g.gain.exponentialRampToValueAtTime(.0001, now + i * gap + hold);
-      o.connect(g); g.connect(ctx.destination);
-      o.start(now + i * gap); o.stop(now + i * gap + hold + .02);
-    });
-    setTimeout(() => ctx.close().catch(() => {}), 1200);
-  } catch (_) {}
+  const notes = mode === "full" ? [523.25, 659.25, 783.99] : [523.25, 659.25];
+  const peak = mode === "full" ? 0.16 : 0.1;
+  const gap = mode === "full" ? 0.12 : 0.1;
+  const hold = mode === "full" ? 0.25 : 0.18;
+  void playToneSequence(notes, { peak, gap, hold });
 }
 
 export function renderReport(record) {
@@ -705,6 +1033,13 @@ export function restoreActiveSession() {
   state.session = saved;
   state.session.tabId = tabId;
   ensureNoteItems(state.session);
+  if (!("nextBreakSuggestionAt" in state.session)) {
+    if (state.prefs.pomodoro && !state.session.currentBreakStartedAt) {
+      rescheduleBreakSuggestionFromFocus(state.session, activeFocusSeconds(state.session));
+    } else {
+      initBreakSuggestionSchedule(state.session);
+    }
+  }
   resetStickyNotes();
   if (state.session.currentBreakStartedAt && state.session.hardcore && currentBreakSeconds(state.session) >= HARDCORE_BREAK_LIMIT_SECONDS) {
     finishSession("failed","Hardcore break limit reached.",false); return;
